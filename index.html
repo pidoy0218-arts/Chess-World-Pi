@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Chess Arena Pi</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #1a1a1a;
+      color: white;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin: 20px;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(8, 50px);
+      grid-template-rows: repeat(8, 50px);
+      gap: 0;
+      border: 2px solid white;
+    }
+    .cell {
+      width: 50px;
+      height: 50px;
+      font-size: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .white { background: #eee; color: black; }
+    .black { background: #444; color: white; }
+    .highlight { background: gold !important; }
+    #soundToggle {
+      margin: 15px;
+      padding: 8px 14px;
+      background: #333;
+      color: white;
+      border: 1px solid white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>♟ The Chess Arena Pi</h1>
+  <button id="soundToggle">🔊 Sound: ON</button>
+  <div class="board" id="board"></div>
+
+  <!-- Sound effects -->
+  <audio id="tapSound" src="assets/sound/tap.ogg"></audio>
+  <audio id="knightSound" src="assets/sound/knight.ogg"></audio>
+
+  <script>
+    const boardEl = document.getElementById("board");
+    const tapSound = document.getElementById("tapSound");
+    const knightSound = document.getElementById("knightSound");
+    const soundToggle = document.getElementById("soundToggle");
+    let soundOn = true;
+
+    let board = [
+      ["♜","♞","♝","♛","♚","♝","♞","♜"],
+      ["♟","♟","♟","♟","♟","♟","♟","♟"],
+      ["","","","","","","",""],
+      ["","","","","","","",""],
+      ["","","","","","","",""],
+      ["","","","","","","",""],
+      ["♙","♙","♙","♙","♙","♙","♙","♙"],
+      ["♖","♘","♗","♕","♔","♗","♘","♖"]
+    ];
+
+    let selected = null;
+    let turn = "white";
+
+    function render() {
+      boardEl.innerHTML = "";
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const cell = document.createElement("div");
+          cell.className = "cell " + ((r + c) % 2 === 0 ? "white" : "black");
+          cell.textContent = board[r][c];
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.addEventListener("click", handleClick);
+          boardEl.appendChild(cell);
+        }
+      }
+    }
+
+    function isWhite(piece) {
+      return "♙♖♘♗♕♔".includes(piece);
+    }
+
+    function isBlack(piece) {
+      return "♟♜♞♝♛♚".includes(piece);
+    }
+
+    function validMove(sr, sc, dr, dc, piece) {
+      const target = board[dr][dc];
+      const sameSide = (isWhite(piece) && isWhite(target)) || (isBlack(piece) && isBlack(target));
+      if (sameSide) return false;
+
+      const drAbs = Math.abs(dr - sr);
+      const dcAbs = Math.abs(dc - sc);
+
+      if (piece === "♙") {
+        if (sc === dc && board[dr][dc] === "") {
+          if (sr === 6 && dr === 4) return true;
+          if (dr === sr - 1) return true;
+        }
+        if (dr === sr - 1 && Math.abs(dc - sc) === 1 && isBlack(target)) return true;
+      }
+      if (piece === "♟") {
+        if (sc === dc && board[dr][dc] === "") {
+          if (sr === 1 && dr === 3) return true;
+          if (dr === sr + 1) return true;
+        }
+        if (dr === sr + 1 && Math.abs(dc - sc) === 1 && isWhite(target)) return true;
+      }
+      if (piece === "♘" || piece === "♞") {
+        return (drAbs === 2 && dcAbs === 1) || (drAbs === 1 && dcAbs === 2);
+      }
+      return false;
+    }
+
+    function handleClick(e) {
+      const r = +e.currentTarget.dataset.row;
+      const c = +e.currentTarget.dataset.col;
+      const piece = board[r][c];
+
+      if (selected) {
+        const [sr, sc] = selected;
+        const movingPiece = board[sr][sc];
+        if ((turn === "white" && isWhite(movingPiece)) || (turn === "black" && isBlack(movingPiece))) {
+          if (validMove(sr, sc, r, c, movingPiece)) {
+            board[r][c] = movingPiece;
+            board[sr][sc] = "";
+            if (soundOn) {
+              if (movingPiece === "♘" || movingPiece === "♞") knightSound.play();
+              else tapSound.play();
+            }
+            turn = turn === "white" ? "black" : "white";
+          }
+        }
+        selected = null;
+        render();
+      } else if (piece && ((turn === "white" && isWhite(piece)) || (turn === "black" && isBlack(piece)))) {
+        selected = [r, c];
+        highlightMoves(r, c, piece);
+      }
+    }
+
+    function highlightMoves(r, c, piece) {
+      render();
+      for (let dr = 0; dr < 8; dr++) {
+        for (let dc = 0; dc < 8; dc++) {
+          if (validMove(r, c, dr, dc, piece)) {
+            const cell = document.querySelector(`[data-row='${dr}'][data-col='${dc}']`);
+            if (cell) cell.classList.add("highlight");
+          }
+        }
+      }
+    }
+
+    soundToggle.addEventListener("click", () => {
+      soundOn = !soundOn;
+      soundToggle.textContent = soundOn ? "🔊 Sound: ON" : "🔇 Sound: OFF";
+    });
+
+    render();
+  </script>
+</body>
+</html>
