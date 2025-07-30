@@ -1,15 +1,10 @@
 chess-world-pi/
-├── index.html                 ← Main entry point (loads board, scripts, sounds)
-│
-├── style/                     ← All CSS styles go here
-│   └── style-board.css        ← Board layout, piece colors, toggle styles
-│
-├── logic/                     ← JavaScript game logic
-│   └── logic-board.js         ← Handles piece movement, sounds, toggles
-│
-├── assets/                    ← All static assets like sounds/images
-│   ├── move-sound.mp3         ← Sound when piece moves
-│   ├── win-sound.mp3          ← (future: for game win)
-│   └── knight-neigh.mp3       ← (future: knight sound effect)
-│
-├── logo.png                   ← Logo shown at top (optional now)
+├── index.html
+├── style/
+│   └── style-board.css         ← base board & future themes
+├── logic/
+│   └── logic-board.js          ← gameplay logic, sound, upgrades
+├── assets/
+│   ├── move-sound.mp3
+│   └── tap.mp3
+├── logo.png                    ← replaceable logo
