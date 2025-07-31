@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chess Arena Pi</title>
+
+  <!-- 🔮 Styles -->
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .logo-container {
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .logo-container img {
+      width: 150px;
+      height: auto;
+      animation: bounceFade 2s ease-in-out;
+      filter: drop-shadow(0 0 10px #f0c000);
+      cursor: pointer;
+    }
+
+    @keyframes bounceFade {
+      0% { transform: scale(0.8); opacity: 0; }
+      50% { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(1); }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body { background-color: #111; color: #fff; }
+    }
+
+    @media (prefers-color-scheme: light) {
+      body { background-color: #fff; color: #000; }
+    }
+
+    .section {
+      padding: 20px;
+      text-align: center;
+    }
+
+    .section-title {
+      font-size: 1.5em;
+      margin-bottom: 10px;
+    }
+
+    .section-placeholder {
+      color: gray;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 🎵 Hidden tap sound -->
+  <audio id="tapSound" preload="auto">
+    <source src="data:audio/ogg;base64,T2dnUwACAAAAAAAAAABVDxYFAAAAAOicZVEBHgF2b3JiaXMAAAAAAUSsAAAAAAACAAACZGF0YbC7AAAA" type="audio/ogg">
+  </audio>
+
+  <!-- 🐴 Logo Section -->
+  <div class="logo-container">
+    <img
+      id="logo"
+      src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABgCAYAAACN2RbfAAABhUlEQVR4nO3UsQ3CMBCF4a5DzA5zC+vVZgUS0cbczD5UdkO0bL6EfFEUJvPYAAAAAOD9gMa1ZfVnv73zv+8tQ8Pq++1b+vD59Z2+u+2HV1va8zQ+yXl8afnxw9//vrfYOfvJwCH3z4eC8YDWYgPhhGg5iA+GEXDmID4YRcOYgPhhFw5iA+GE3DBID4YRcOYgPhhNwwSA+GE3DBID4YRcOYgPhhFw5iA+GE3DBID4YRcOYgPhhFw5iA+GE3DBID4YRcOYgPhhFw5iA+GE3DBID4YRcOYgPhhFw5iA+GE3DBID4YRcOYgPhhFw5iA+GE3DBID4YRcOYgPhhFw5iA+GE3DBID4YRcOYgPhhFw5iA+GE3DBID4YRcOYgPhhNwwSA+GE3DBLIAAAAAASUVORK5CYII="
+      alt="Chess Arena Pi Logo"
+    />
+  </div>
+
+  <!-- ♟️ Placeholder Sections -->
+  <div class="section" id="login-section">
+    <div class="section-title">Login System</div>
+    <div class="section-placeholder">[ Coming soon... ]</div>
+  </div>
+
+  <div class="section" id="game-section">
+    <div class="section-title">Game Board</div>
+    <div class="section-placeholder">[ Placeholder for chess gameplay ]</div>
+  </div>
+
+  <div class="section" id="leaderboard-section">
+    <div class="section-title">Leaderboard</div>
+    <div class="section-placeholder">[ Placeholder for rankings ]</div>
+  </div>
+
+  <div class="section" id="puzzle-section">
+    <div class="section-title">Puzzle Mode</div>
+    <div class="section-placeholder">[ Puzzle challenges will be shown here ]</div>
+  </div>
+
+  <!-- 🧠 JS: Play sound on logo tap -->
+  <script>
+    const logo = document.getElementById("logo");
+    const tapSound = document.getElementById("tapSound");
+
+    logo.addEventListener("click", () => {
+      tapSound.currentTime = 0;
+      tapSound.play();
+    });
+  </script>
+</body>
+</html>
