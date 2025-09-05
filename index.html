@@ -1,159 +1,130 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Chess Arena Pi – Classic 10-min Blitz</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-:root{
-  --bg:#111; --fg:#eee; --light:#f0f0f0; --dark:#b1e59f; --sel:#ffcc00; 
-  --hint:#5ac8fa; --accent:#f4b400; --warn:#ff5252
-}
-body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font-family:system-ui,Arial;display:flex;flex-direction:column;align-items:center;}
-h1{margin:6px 0 2px;font-size:22px;text-align:center;}
-.wrap{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;justify-content:center;width:100%;max-width:1100px;}
-#board{display:grid;grid-template-columns:repeat(8,min(10vw,66px));grid-template-rows:repeat(8,min(10vw,66px));border:6px solid #333;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.45);}
-.sq{display:flex;align-items:center;justify-content:center;font-size:min(8vw,50px);cursor:pointer;}
-.sq.light{background:var(--light);}
-.sq.dark{background:var(--dark);}
-.piece.white{color:#b8860b;text-shadow:2px 2px 0 #000;font-weight:900;}
-.piece.black{color:#000;font-weight:900;}
-.sq.sel{outline:3px solid var(--sel);outline-offset:-3px;}
-.sq.hint::after{content:"";width:22%;height:22%;border-radius:50%;background:var(--hint);opacity:.85;display:block;}
-.sq.cap{box-shadow: inset 0 0 0 4px var(--warn);}
-.side{min-width:260px;max-width:360px;display:flex;flex-direction:column;gap:10px;}
-.panel{background:#1b1b1b;border:1px solid #2b2b2b;border-radius:10px;padding:10px 12px;}
-.row{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-.timer{font-weight:700;font-size:18px;text-align:center;margin-bottom:4px;}
-.moves{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.45;max-height:260px;overflow:auto;}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:10;}
-.modal.show{display:flex;}
-.card{background:#1e1e1e;border:1px solid #2d2d2d;padding:16px;border-radius:12px;min-width:260px;}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px;}
-.pick{font-size:34px;padding:10px;border-radius:10px;border:1px solid #333;background:#121212;color:#fff;cursor:pointer;}
-#fx{position:fixed;inset:0;pointer-events:none;z-index:9;}
-select{padding:6px;border-radius:6px;background:#222;color:#fff;border:1px solid #555;}
-</style>
-</head>
-<body>
-<h1>♞ Chess Arena Pi – Classic 10-min</h1>
-
-<div class="wrap">
-  <div id="board" aria-label="chessboard"></div>
-
-  <div class="side">
-    <div class="panel">
-      <div class="timer" id="whiteTimer">White: 10:00</div>
-      <div class="timer" id="blackTimer">Black: 10:00</div>
-      <div id="status" style="font-weight:700;text-align:center">White to move</div>
-    </div>
-
-    <div class="panel">
-      <div class="row"><div><b>Move List</b></div></div>
-      <div id="moves" class="moves"></div>
-    </div>
-
-    <div class="panel">
-      <div class="row">
-        <div><b>Leaderboard / Personal Best</b></div>
-        <select id="leaderboard">
-          <option value="">--Select Player--</option>
-        </select>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="promo" class="modal" role="dialog" aria-modal="true">
-  <div class="card">
-    <div style="font-weight:700;margin-bottom:6px">Promote pawn to:</div>
-    <div class="grid4">
-      <button class="pick" data-piece="q">♛</button>
-      <button class="pick" data-piece="r">♜</button>
-      <button class="pick" data-piece="b">♝</button>
-      <button class="pick" data-piece="n">♞</button>
-    </div>
-  </div>
-</div>
-
-<canvas id="fx"></canvas>
 
 <script>
-/* ------------------ Config ------------------ */
-const AUTO_PROMOTE = true; // auto queen
-const INITIAL_TIME = 600; // 10 min = 600s
-let timers = { w: INITIAL_TIME, b: INITIAL_TIME };
-let timerInterval = null;
-
-/* -------------- Sound (WebAudio) -------------- */
-const SND = (() => {
-  let ctx;
-  function beep(freq=600, dur=0.08, type='square', vol=0.05){
-    try{
-      ctx = ctx || new (window.AudioContext||window.webkitAudioContext)();
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = type; o.frequency.value = freq; g.gain.value = vol;
-      o.connect(g); g.connect(ctx.destination); o.start();
-      setTimeout(()=> o.stop(), dur*1000);
-    }catch(e){}
-  }
-  return {
-    move:()=>beep(640,0.07,'square',0.05),
-    capture:()=>{beep(220,0.05,'sawtooth',0.06); setTimeout(()=>beep(180,0.09,'sawtooth',0.05),60);},
-    check:()=>beep(900,0.12,'triangle',0.06),
-    win:()=>{ [880,988,1175].forEach((f,i)=>setTimeout(()=>beep(f,0.12,'triangle',0.08), i*120)); }
-  };
-})();
-
-/* ---------------- Confetti ---------------- */
-const Confetti = (() => {
-  const c = document.getElementById('fx'), x = c.getContext('2d');
-  let parts=[], run=false, w=0,h=0;
-  function resize(){ w=c.width=innerWidth; h=c.height=innerHeight; }
-  addEventListener('resize', resize); resize();
-  function burst(n=120){
-    parts=[]; for(let i=0;i<n;i++) parts.push({ x:w/2, y:h*0.25, vx:(Math.random()*2-1)*6, vy:Math.random()*-6-2, g:Math.random()*0.18+0.12, s:Math.random()*6+3, a:Math.random()*Math.PI, col:`hsl(${Math.random()*360},90%,60%)` });
-    if(!run){ run=true; requestAnimationFrame(loop); }
-  }
-  function loop(){
-    x.clearRect(0,0,w,h);
-    for(const p of parts){ p.vy += p.g; p.x += p.vx; p.y += p.vy; p.a += 0.2; x.save(); x.translate(p.x,p.y); x.rotate(p.a); x.fillStyle=p.col; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); }
-    parts = parts.filter(p=>p.y<h+30);
-    if(parts.length) requestAnimationFrame(loop); else run=false;
-  }
-  return { burst };
-})();
-
 /* ----------------- Utilities ----------------- */
-const U = {
-  inBounds:(r,c)=>r>=0 && r<8 && c>=0 && c<8,
-  clone:(o)=>JSON.parse(JSON.stringify(o)),
-  toAlg:(r,c)=>"abcdefgh"[c] + (8 - r),
-  fromAlg:(a)=>({ r: 8 - parseInt(a[1],10), c: "abcdefgh".indexOf(a[0]) })
-};
+function other(side){ return side === 'w' ? 'b' : 'w'; }
 
-/* ----------------- Chess Core ----------------- */
-const START = [
-  ["r","n","b","q","k","b","n","r"],
-  ["p","p","p","p","p","p","p","p"],
-  ["","","","","","","",""],
-  ["","","","","","","",""],
-  ["","","","","","","",""],
-  ["","","","","",""],
-  ["P","P","P","P","P","P","P","P"],
-  ["R","N","B","Q","K","B","N","R"]
-];
+/* ----------------- Board Rendering ----------------- */
+const boardEl = document.getElementById('board');
+function renderBoard(){
+  boardEl.innerHTML = '';
+  for(let r=0;r<8;r++){
+    for(let c=0;c<8;c++){
+      const sq = document.createElement('div');
+      sq.className = 'sq ' + ((r+c)%2?'dark':'light');
+      sq.dataset.r = r; sq.dataset.c = c;
+      const p = state.board[r][c];
+      if(p){
+        const piece = document.createElement('div');
+        piece.className = 'piece ' + (isWhite(p)?'white':'black');
+        piece.textContent = p === 'P'?'♙':
+                            p === 'R'?'♖':
+                            p === 'N'?'♘':
+                            p === 'B'?'♗':
+                            p === 'Q'?'♕':
+                            p === 'K'?'♔':
+                            p === 'p'?'♟':
+                            p === 'r'?'♜':
+                            p === 'n'?'♞':
+                            p === 'b'?'♝':
+                            p === 'q'?'♛':
+                            p === 'k'?'♚':'';
+        sq.appendChild(piece);
+      }
+      sq.addEventListener('click',onSquareClick);
+      boardEl.appendChild(sq);
+    }
+  }
+}
+renderBoard();
 
-let state = {
-  board: U.clone(START),
-  side: 'w',
-  castling: { wk:true, wq:true, bk:true, bq:true },
-  ep: null,
-  half:0, full:1,
-  hist: []
-};
+/* ----------------- Move Logic ----------------- */
+let sel=null;
+function onSquareClick(e){
+  const r = parseInt(e.currentTarget.dataset.r);
+  const c = parseInt(e.currentTarget.dataset.c);
+  const piece = state.board[r][c];
+  if(sel){
+    if(movePiece(sel.r,sel.c,r,c)){
+      sel=null;
+      renderBoard();
+      SND.move();
+      updateStatus();
+    } else {
+      sel=null;
+      renderBoard();
+    }
+  } else {
+    if(piece && sidePiece(piece,state.side)){
+      sel={r,c};
+      e.currentTarget.classList.add('sel');
+    }
+  }
+}
 
-function isWhite(p){ return p && p === p.toUpperCase(); }
-function isBlack(p){ return p && p === p.toLowerCase(); }
-function sidePiece(p, side){ return side === 'w' ? isWhite(p) : isBlack(p); }
-function other(side){ return side === 'w' ? 'b' :
+function movePiece(r1,c1,r2,c2){
+  const p = state.board[r1][c1];
+  if(!p) return false;
+  // Simplified: allow any move for demonstration
+  state.board[r2][c2] = p;
+  state.board[r1][c1] = '';
+  state.side = other(state.side);
+  state.hist.push({from:U.toAlg(r1,c1),to:U.toAlg(r2,c2)});
+  addMoveToList(state.hist[state.hist.length-1]);
+  return true;
+}
+
+function addMoveToList(move){
+  const movesEl = document.getElementById('moves');
+  const el = document.createElement('div');
+  el.textContent = `${move.from} → ${move.to}`;
+  movesEl.appendChild(el);
+}
+
+/* ----------------- Status & Timers ----------------- */
+const whiteTimerEl = document.getElementById('whiteTimer');
+const blackTimerEl = document.getElementById('blackTimer');
+const statusEl = document.getElementById('status');
+
+function updateStatus(){
+  statusEl.textContent = state.side==='w'?'White to move':'Black to move';
+}
+
+function startTimers(){
+  if(timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(()=>{
+    timers[state.side]--;
+    const mins = Math.floor(timers[state.side]/60).toString().padStart(2,'0');
+    const secs = (timers[state.side]%60).toString().padStart(2,'0');
+    if(state.side==='w') whiteTimerEl.textContent = `White: ${mins}:${secs}`;
+    else blackTimerEl.textContent = `Black: ${mins}:${secs}`;
+    if(timers[state.side]<=0){
+      clearInterval(timerInterval);
+      statusEl.textContent = (state.side==='w'?'White':'Black')+' lost on time!';
+      SND.win();
+      Confetti.burst();
+    }
+  },1000);
+}
+startTimers();
+
+/* ----------------- Pawn Promotion ----------------- */
+const promoModal = document.getElementById('promo');
+document.querySelectorAll('.pick').forEach(btn=>{
+  btn.addEventListener('click',e=>{
+    const piece = btn.dataset.piece;
+    const lastMove = state.hist[state.hist.length-1];
+    if(lastMove){
+      const {r:toR, c:toC} = U.fromAlg(lastMove.to);
+      state.board[toR][toC] = state.side==='w'?piece.toUpperCase():piece.toLowerCase();
+      promoModal.classList.remove('show');
+      renderBoard();
+    }
+  });
+});
+
+/* ----------------- Leaderboard Placeholder ----------------- */
+const leaderboard = document.getElementById('leaderboard');
+// You can populate via Pi SDK later
+leaderboard.innerHTML += `<option value="player1">Player 1</option><option value="player2">Player 2</option>`;
+
+</script>
