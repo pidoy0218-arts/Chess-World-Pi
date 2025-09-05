@@ -7,7 +7,6 @@
 <style>
 :root{
   --bg:#111; --fg:#eee; --light:#f0f0f0; --dark:#b1e59f; --sel:#ffcc00; 
-  --hint:#5ac8fa; --accent:#f4b400; --warn:#ff5252
 }
 body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font-family:system-ui,Arial;display:flex;flex-direction:column;align-items:center;}
 h1{margin:6px 0 8px;font-size:22px;text-align:center;}
@@ -18,21 +17,13 @@ h1{margin:6px 0 8px;font-size:22px;text-align:center;}
 .sq.dark{background:var(--dark);}
 .piece.white{color:#b8860b;text-shadow:2px 2px 0 #000;font-weight:900;}
 .piece.black{color:#000;font-weight:900;}
-.sq.sel{outline:3px solid var(--sel);outline-offset:-3px;}
-.sq.hint::after{content:"";width:22%;height:22%;border-radius:50%;background:var(--hint);opacity:.85;display:block;}
 .side{min-width:260px;max-width:360px;display:flex;flex-direction:column;gap:10px;}
 .panel{background:#1b1b1b;border:1px solid #2b2b2b;border-radius:10px;padding:10px 12px;}
-.row{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-.timer{font-weight:700;font-size:18px;text-align:center;margin-bottom:4px;}
+.player{display:flex;justify-content:space-between;margin-bottom:6px;font-weight:700;font-size:16px;}
+.timer{font-weight:700;font-size:18px;text-align:center;margin-bottom:6px;}
 .moves{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.45;max-height:260px;overflow:auto;}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:10;}
-.modal.show{display:flex;}
-.card{background:#1e1e1e;border:1px solid #2d2d2d;padding:16px;border-radius:12px;min-width:260px;}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px;}
-.pick{font-size:34px;padding:10px;border-radius:10px;border:1px solid #333;background:#121212;color:#fff;cursor:pointer;}
 #fx{position:fixed;inset:0;pointer-events:none;z-index:9;}
 select{padding:6px;border-radius:6px;background:#222;color:#fff;border:1px solid #555;width:100%;}
-.player{display:flex;justify-content:space-between;margin-bottom:6px;font-weight:700;}
 </style>
 </head>
 <body>
@@ -44,35 +35,18 @@ select{padding:6px;border-radius:6px;background:#222;color:#fff;border:1px solid
   <div class="side">
     <div class="panel">
       <div class="player"><span id="p1">P1</span><span id="p2">P2</span></div>
-      <div class="timer" id="whiteTimer">10:00</div>
-      <div class="timer" id="blackTimer">10:00</div>
-      <div id="status" style="font-weight:700;text-align:center">White to move</div>
+      <div class="timer" id="p1Timer">10:00</div>
+      <div class="timer" id="p2Timer">10:00</div>
     </div>
 
     <div class="panel">
-      <div class="row"><div><b>Move List</b></div></div>
-      <div id="moves" class="moves"></div>
+      <div class="moves" id="moves"></div>
     </div>
 
     <div class="panel">
-      <div class="row">
-        <div><b>Leaderboard / Personal Best</b></div>
-        <select id="leaderboard">
-          <option value="">--Select Player--</option>
-        </select>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="promo" class="modal" role="dialog" aria-modal="true">
-  <div class="card">
-    <div style="font-weight:700;margin-bottom:6px">Promote pawn to:</div>
-    <div class="grid4">
-      <button class="pick" data-piece="q">♛</button>
-      <button class="pick" data-piece="r">♜</button>
-      <button class="pick" data-piece="b">♝</button>
-      <button class="pick" data-piece="n">♞</button>
+      <select id="leaderboard">
+        <option value="">--Leaderboard / Personal Best--</option>
+      </select>
     </div>
   </div>
 </div>
@@ -83,10 +57,6 @@ select{padding:6px;border-radius:6px;background:#222;color:#fff;border:1px solid
 <script>
 const boardEl = document.getElementById('board');
 const movesEl = document.getElementById('moves');
-const statusEl = document.getElementById('status');
-const promoModal = document.getElementById('promo');
-let promoCallback=null;
-
 const game = new Chess();
 let selectedSquare = null;
 
@@ -99,7 +69,6 @@ function renderBoard(){
       sq.className='sq '+((r+c)%2?'dark':'light');
       sq.dataset.r=r;
       sq.dataset.c=c;
-
       const piece = b[r][c];
       if(piece){
         const el = document.createElement('div');
@@ -111,96 +80,44 @@ function renderBoard(){
                          piece.type==='q'?'♛':'♚';
         sq.appendChild(el);
       }
-
       sq.addEventListener('click',()=>onSquareClick(r,c));
       boardEl.appendChild(sq);
     }
   }
 }
-
 function onSquareClick(r,c){
-  const square = 'abcdefgh'[c] + (8-r);
+  const square='abcdefgh'[c]+(8-r);
   if(selectedSquare){
     let move = game.move({from:selectedSquare,to:square,promotion:'q'});
-    if(move && move.flags.includes('p')){ // pawn promotion
-      promoModal.classList.add('show');
-      promoCallback=(choice)=>{
-        game.undo();
-        game.move({from:selectedSquare,to:square,promotion:choice});
-        promoModal.classList.remove('show');
-        selectedSquare=null;
-        renderBoard();
-        updateStatus();
-      };
-    } else if(move){
+    if(move){
       selectedSquare=null;
       renderBoard();
-      updateStatus();
+      updateMoves();
     } else selectedSquare=null;
   } else {
     const piece = game.get(square);
     if(piece && piece.color===game.turn()) selectedSquare=square;
   }
 }
-
-document.querySelectorAll('.pick').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    if(promoCallback) promoCallback(btn.dataset.piece);
-  });
-});
-
-function updateStatus(){
-  const s = game.turn()==='w'?'White':'Black';
-  statusEl.textContent=s+' to move';
+function updateMoves(){
   movesEl.textContent=game.history().join(', ');
-  if(game.in_checkmate()) statusEl.textContent=s+' lost by checkmate!';
-  else if(game.in_stalemate()) statusEl.textContent='Stalemate!';
 }
-
 renderBoard();
-updateStatus();
+updateMoves();
 
-/* --------- Timer 10min no increment --------- */
+/* Timer 10min each, no increment */
 let timers={w:600,b:600};
-const whiteTimerEl=document.getElementById('whiteTimer');
-const blackTimerEl=document.getElementById('blackTimer');
-
+const p1TimerEl=document.getElementById('p1Timer');
+const p2TimerEl=document.getElementById('p2Timer');
 setInterval(()=>{
   if(game.game_over()) return;
-  timers[game.turn()]--;
+  const turn=game.turn();
+  timers[turn]--;
   const wMin=Math.floor(timers.w/60), wSec=timers.w%60;
   const bMin=Math.floor(timers.b/60), bSec=timers.b%60;
-  whiteTimerEl.textContent=`${wMin}:${wSec.toString().padStart(2,'0')}`;
-  blackTimerEl.textContent=`${bMin}:${bSec.toString().padStart(2,'0')}`;
-  if(timers.w<=0 || timers.b<=0) statusEl.textContent='Time over!';
+  p1TimerEl.textContent=`${wMin}:${wSec.toString().padStart(2,'0')}`;
+  p2TimerEl.textContent=`${bMin}:${bSec.toString().padStart(2,'0')}`;
 },1000);
-
-/* --------- Confetti & Sound --------- */
-const SND=(()=>{
-  let ctx;
-  function beep(freq=600,dur=0.08,type='square',vol=0.05){
-    try{ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
-      const o=ctx.createOscillator(), g=ctx.createGain();
-      o.type=type;o.frequency.value=freq;g.gain.value=vol;o.connect(g);g.connect(ctx.destination);o.start();
-      setTimeout(()=>o.stop(),dur*1000);
-    }catch(e){}
-  }
-  return {
-    move:()=>beep(640,0.07,'square',0.05),
-    capture:()=>{beep(220,0.05,'sawtooth',0.06);setTimeout(()=>beep(180,0.09,'sawtooth',0.05),60);},
-    check:()=>beep(900,0.12,'triangle',0.06),
-    win:()=>{ [880,988,1175].forEach((f,i)=>setTimeout(()=>beep(f,0.12,'triangle',0.08),i*120)); }
-  };
-})();
-const Confetti=(()=>{
-  const c=document.getElementById('fx'),x=c.getContext('2d');let parts=[],run=false,w=0,h=0;
-  function resize(){w=c.width=innerWidth;h=c.height=innerHeight;}
-  addEventListener('resize',resize);resize();
-  function burst(n=120){parts=[];for(let i=0;i<n;i++) parts.push({x:w/2,y:h*0.25,vx:(Math.random()*2-1)*6,vy:(Math.random()*-6-2),g:Math.random()*0.18+0.12,s:Math.random()*6+3,a:Math.random()*Math.PI,col:`hsl(${Math.random()*360},90%,60%)`});if(!run){run=true;requestAnimationFrame(loop);}}
-  function loop(){x.clearRect(0,0,w,h);for(const p of parts){p.vy+=p.g;p.x+=p.vx;p.y+=p.vy;p.a+=0.2;x.save();x.translate(p.x,p.y);x.rotate(p.a);x.fillStyle=p.col;x.fillRect(-p.s/2,-p.s/2,p.s,p.s);x.restore();}
-    parts=parts.filter(p=>p.y<h+30);if(parts.length) requestAnimationFrame(loop);else run=false;}
-  return {burst};
-})();
 </script>
 </body>
 </html>
