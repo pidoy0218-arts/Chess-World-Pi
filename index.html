@@ -6,84 +6,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 :root{
-  --bg:#111; --fg:#eee; --light:#f0f0f0; --dark:#b1e59f; --sel:#ffcc00; 
-  --hint:#5ac8fa; --warn:#ff5252;
+  --bg:#111; --fg:#eee; --light:#f0f0f0; --dark:#b1e59f;
 }
 body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font-family:system-ui,Arial;display:flex;flex-direction:column;align-items:center;}
 h1{margin:6px 0 12px;font-size:22px;text-align:center;}
-.wrap{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;justify-content:center;width:100%;max-width:1100px;}
-#board{display:grid;grid-template-columns:repeat(8,min(10vw,66px));grid-template-rows:repeat(8,min(10vw,66px));border:6px solid #333;border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.45);}
-.sq{display:flex;align-items:center;justify-content:center;font-size:min(8vw,50px);cursor:pointer;}
+.wrap{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;justify-content:center;}
+#board{display:grid;grid-template-columns:repeat(8,60px);grid-template-rows:repeat(8,60px);border:6px solid #333;border-radius:10px;overflow:hidden;}
+.sq{display:flex;align-items:center;justify-content:center;font-size:40px;}
 .sq.light{background:var(--light);}
 .sq.dark{background:var(--dark);}
-.sq.sel{outline:3px solid var(--sel);outline-offset:-3px;}
-.piece.white{color:#b8860b;text-shadow:2px 2px 0 #000;font-weight:900;}
-.piece.black{color:#000;font-weight:900;}
-.side{min-width:260px;max-width:360px;display:flex;flex-direction:column;gap:10px;}
-.panel{background:#1b1b1b;border:1px solid #2b2b2b;border-radius:10px;padding:10px;}
-.player{display:flex;justify-content:space-between;font-weight:700;font-size:16px;margin-bottom:4px;}
-.timer{font-weight:700;font-size:18px;text-align:center;margin-bottom:6px;}
-.captured{display:flex;justify-content:center;gap:4px;margin-bottom:6px;min-height:28px;}
-.moves{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.45;max-height:260px;overflow:auto;}
-select{padding:6px;border-radius:6px;background:#222;color:#fff;border:1px solid #555;width:100%;}
-#fx{position:fixed;inset:0;pointer-events:none;z-index:9;}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:10;}
-.modal.show{display:flex;}
-.card{background:#1e1e1e;border:1px solid #2d2d2d;padding:16px;border-radius:12px;min-width:260px;}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px;}
-.pick{font-size:34px;padding:10px;border-radius:10px;border:1px solid #333;background:#121212;color:#fff;cursor:pointer;}
+.piece.white{color:#b8860b;text-shadow:2px 2px 0 #000;}
+.piece.black{color:#000;}
+.side{display:flex;flex-direction:column;gap:12px;}
+.playerPanel{background:#1b1b1b;border:1px solid #2b2b2b;border-radius:10px;padding:10px;text-align:center;}
+.playerName{font-weight:700;font-size:16px;margin-bottom:4px;}
+.timer{font-weight:700;font-size:18px;margin-bottom:6px;}
+.captured{display:flex;justify-content:center;gap:4px;min-height:24px;}
+.moves{background:#1b1b1b;border:1px solid #2b2b2b;border-radius:10px;padding:10px;font-family:monospace;font-size:13px;max-height:200px;overflow:auto;}
 </style>
 </head>
 <body>
 <h1>♞ Chess Arena Pi – Classic 10-min</h1>
 
 <div class="wrap">
-  <div id="board" aria-label="chessboard"></div>
+  <div id="board"></div>
 
   <div class="side">
-    <div class="panel">
-      <div class="player"><span id="p1">P1</span><span id="p2">P2</span></div>
+    <div class="playerPanel">
+      <div class="playerName" id="p1">Player 1</div>
       <div class="timer" id="p1Timer">10:00</div>
       <div class="captured" id="p1Captured"></div>
+    </div>
+    <div class="playerPanel">
+      <div class="playerName" id="p2">Player 2</div>
       <div class="timer" id="p2Timer">10:00</div>
       <div class="captured" id="p2Captured"></div>
     </div>
-
-    <div class="panel">
-      <div class="moves" id="moves"></div>
-    </div>
-
-    <div class="panel">
-      <select id="leaderboard">
-        <option value="">--Leaderboard / Personal Best--</option>
-      </select>
-    </div>
-  </div>
-</div>
-
-<canvas id="fx"></canvas>
-
-<div id="promo" class="modal">
-  <div class="card">
-    <div style="font-weight:700;margin-bottom:6px">Promote pawn to:</div>
-    <div class="grid4">
-      <button class="pick" data-piece="q">♛</button>
-      <button class="pick" data-piece="r">♜</button>
-      <button class="pick" data-piece="b">♝</button>
-      <button class="pick" data-piece="n">♞</button>
-    </div>
+    <div class="moves" id="moves"></div>
   </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
 <script>
-/* ----------------- Chess Setup ----------------- */
 const boardEl=document.getElementById('board');
 const movesEl=document.getElementById('moves');
-const p1CapturedEl=document.getElementById('p1Captured');
-const p2CapturedEl=document.getElementById('p2Captured');
-const promoModal=document.getElementById('promo');
-let promoChoice='q';
 const game=new Chess();
 let selected=null;
 
@@ -94,7 +60,7 @@ function renderBoard(){
     for(let c=0;c<8;c++){
       const sq=document.createElement('div');
       sq.className='sq '+((r+c)%2?'dark':'light');
-      sq.dataset.r=r;sq.dataset.c=c;
+      const square='abcdefgh'[c]+(8-r);
       const piece=b[r][c];
       if(piece){
         const el=document.createElement('div');
@@ -106,28 +72,20 @@ function renderBoard(){
                         piece.type==='q'?'♛':'♚';
         sq.appendChild(el);
       }
-      sq.addEventListener('click',()=>onClickSquare(r,c));
+      sq.addEventListener('click',()=>onClickSquare(square));
       boardEl.appendChild(sq);
     }
   }
 }
 
-function onClickSquare(r,c){
-  const square='abcdefgh'[c]+(8-r);
+function onClickSquare(square){
   if(selected){
-    let move={from:selected,to:square};
-    const piece=game.get(selected);
-    if(piece && piece.type==='p' && (square[1]==='8'||square[1]==='1')){
-      move.promotion=promoChoice;
-    }
+    let move={from:selected,to:square,promotion:'q'};
     const result=game.move(move);
     if(result){
       selected=null;
       renderBoard();
       updateMoves();
-      updateCaptured();
-      if(game.in_checkmate()){confetti();alert(`${result.color==='w'?'White':'Black'} wins by checkmate`);}
-      else if(game.in_stalemate()){alert('Stalemate');}
     } else selected=null;
   } else {
     const piece=game.get(square);
@@ -135,24 +93,14 @@ function onClickSquare(r,c){
   }
 }
 
-function updateMoves(){movesEl.textContent=game.history().join(', ');}
-function updateCaptured(){
-  p1CapturedEl.textContent='';p2CapturedEl.textContent='';
-  // Can later fill with real captured pieces
+function updateMoves(){
+  movesEl.textContent=game.history().join(' ');
 }
+
 renderBoard();
 updateMoves();
-updateCaptured();
 
-/* -------------- Promotion ---------------- */
-document.querySelectorAll('.pick').forEach(btn=>{
-  btn.addEventListener('click',e=>{
-    promoChoice=e.target.dataset.piece;
-    promoModal.classList.remove('show');
-  });
-});
-
-/* -------------- Timer 10min each ---------------- */
+/* ----------- Timers ----------- */
 let timers={w:600,b:600};
 const p1TimerEl=document.getElementById('p1Timer');
 const p2TimerEl=document.getElementById('p2Timer');
@@ -165,26 +113,6 @@ setInterval(()=>{
   p1TimerEl.textContent=`${wMin}:${wSec.toString().padStart(2,'0')}`;
   p2TimerEl.textContent=`${bMin}:${bSec.toString().padStart(2,'0')}`;
 },1000);
-
-/* -------------- Confetti ---------------- */
-const Confetti=(function(){
-  const c=document.getElementById('fx'), x=c.getContext('2d');
-  let parts=[], run=false, w=0,h=0;
-  function resize(){ w=c.width=innerWidth; h=c.height=innerHeight; }
-  addEventListener('resize',resize); resize();
-  function burst(n=120){
-    parts=[]; for(let i=0;i<n;i++) parts.push({ x:w/2, y:h*0.25, vx:(Math.random()*2-1)*6, vy:(Math.random()*-6-2), g:Math.random()*0.18+0.12, s:Math.random()*6+3, a:Math.random()*Math.PI, col:`hsl(${Math.random()*360},90%,60%)` });
-    if(!run){ run=true; requestAnimationFrame(loop); }
-  }
-  function loop(){
-    x.clearRect(0,0,w,h);
-    for(const p of parts){p.vy+=p.g;p.x+=p.vx;p.y+=p.vy;p.a+=0.2;x.save();x.translate(p.x,p.y);x.rotate(p.a);x.fillStyle=p.col;x.fillRect(-p.s/2,-p.s/2,p.s,p.s);x.restore();}
-    parts=parts.filter(p=>p.y<h+30);
-    if(parts.length) requestAnimationFrame(loop); else run=false;
-  }
-  return { burst };
-})();
-function confetti(){Confetti.burst();}
 </script>
 </body>
 </html>
