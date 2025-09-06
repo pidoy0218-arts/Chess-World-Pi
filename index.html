@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess Arena Pi – Classic Match</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: #222;
+    color: white;
+    flex-direction: column;
+  }
+
+  /* Loader */
+  .loader {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    margin-bottom: 25px;
+  }
+  .pi-symbol {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 32px;
+    color: gold;
+    font-weight: bold;
+  }
+  .orbit-dot {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: gold;
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(0deg) translate(45px);
+    animation: orbit 2s linear infinite;
+  }
+  .orbit-dot:nth-child(1) { animation-delay: 0s; }
+  .orbit-dot:nth-child(2) { animation-delay: -0.25s; }
+  .orbit-dot:nth-child(3) { animation-delay: -0.5s; }
+  .orbit-dot:nth-child(4) { animation-delay: -0.75s; }
+  .orbit-dot:nth-child(5) { animation-delay: -1s; }
+  .orbit-dot:nth-child(6) { animation-delay: -1.25s; }
+  .orbit-dot:nth-child(7) { animation-delay: -1.5s; }
+  .orbit-dot:nth-child(8) { animation-delay: -1.75s; }
+
+  @keyframes orbit {
+    from { transform: translate(-50%, -50%) rotate(0deg) translate(45px); }
+    to   { transform: translate(-50%, -50%) rotate(360deg) translate(45px); }
+  }
+
+  /* Buttons */
+  .button-container {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    width: 220px;
+  }
+  button {
+    padding: 12px;
+    font-size: 14px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #2196f3;
+    color: white;
+    transition: 0.3s;
+    width: 100%;
+  }
+  button:hover {
+    background: #0b79d0;
+  }
+
+  /* Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 999;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    justify-content: center;
+    align-items: center;
+  }
+  .modal-content {
+    background: #333;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    color: white;
+  }
+  .modal-content button {
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Loader -->
+<div class="loader" id="loader">
+  <div class="pi-symbol">π</div>
+  <div class="orbit-dot"></div>
+  <div class="orbit-dot"></div>
+  <div class="orbit-dot"></div>
+  <div class="orbit-dot"></div>
+  <div class="orbit-dot"></div>
+  <div class="orbit-dot"></div>
+  <div class="orbit-dot"></div>
+  <div class="orbit-dot"></div>
+</div>
+
+<!-- Buttons -->
+<div class="button-container" id="buttons">
+  <button onclick="inviteMatch()">© Invite</button>
+  <button onclick="randomMatch()">© Random</button>
+  <button onclick="aiMatch()">© AI</button>
+</div>
+
+<!-- AI Modal -->
+<div class="modal" id="aiModal">
+  <div class="modal-content">
+    <h3>Play vs AI</h3>
+    <button onclick="payAI()">💰 Pay with Pi</button>
+    <button onclick="watchAd()">🎥 Watch Ad</button>
+    <button onclick="closeModal('aiModal')">Cancel</button>
+  </div>
+</div>
+
+<!-- Pi SDK -->
+<script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<script>
+  // Init Pi SDK
+  Pi.init({ version: "2.0", sandbox: true, appId: "chess-world-pi" });
+
+  setTimeout(() => {
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('buttons').style.display = 'flex';
+  }, 4000);
+
+  function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+  function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+  // === Invite ===
+  function inviteMatch() {
+    Pi.createPayment({
+      amount: 0.25,
+      memo: "Invite Match",
+      metadata: { mode: "invite" }
+    }, {
+      onReadyForServerApproval: (paymentId) => {
+        console.log("Invite payment ready", paymentId);
+      },
+      onReadyForServerCompletion: (paymentId, txid) => {
+        console.log("Invite payment done", paymentId, txid);
+        window.location.href = "game.html?mode=invite";
+      },
+      onCancel: () => alert("❌ Invite cancelled"),
+      onError: (err) => alert("⚠️ " + err)
+    });
+  }
+
+  // === Random ===
+  function randomMatch() {
+    Pi.createPayment({
+      amount: 0.25,
+      memo: "Random Match",
+      metadata: { mode: "random" }
+    }, {
+      onReadyForServerCompletion: (paymentId, txid) => {
+        console.log("Random paired", paymentId, txid);
+        window.location.href = "game.html?mode=random";
+      },
+      onCancel: () => alert("❌ Random cancelled"),
+      onError: (err) => alert("⚠️ " + err)
+    });
+  }
+
+  // === AI ===
+  function aiMatch() { openModal('aiModal'); }
+
+  function payAI() {
+    Pi.createPayment({
+      amount: 0.1,
+      memo: "AI Match (paid)",
+      metadata: { mode: "ai", method: "pay" }
+    }, {
+      onReadyForServerCompletion: () => {
+        window.location.href = "ai.html?method=pay";
+      },
+      onCancel: () => alert("❌ AI payment cancelled"),
+      onError: (err) => alert("⚠️ " + err)
+    });
+    closeModal('aiModal');
+  }
+
+  function watchAd() {
+    alert("🎥 Watching Ad...");
+    setTimeout(() => {
+      alert("✅ Ad finished. Starting AI match.");
+      window.location.href = "ai.html?method=ad";
+    }, 4000);
+    closeModal('aiModal');
+  }
+</script>
+</body>
+</html>
