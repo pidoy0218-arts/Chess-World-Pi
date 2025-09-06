@@ -1,118 +1,308 @@
-6<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Chess Arena Pi – Classic 10-min</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess Arena – Classic Game</title>
 <style>
-:root{
-  --bg:#111; --fg:#eee; --light:#f0f0f0; --dark:#b1e59f;
-}
-body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font-family:system-ui,Arial;display:flex;flex-direction:column;align-items:center;}
-h1{margin:6px 0 12px;font-size:22px;text-align:center;}
-.wrap{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;justify-content:center;}
-#board{display:grid;grid-template-columns:repeat(8,60px);grid-template-rows:repeat(8,60px);border:6px solid #333;border-radius:10px;overflow:hidden;}
-.sq{display:flex;align-items:center;justify-content:center;font-size:40px;}
-.sq.light{background:var(--light);}
-.sq.dark{background:var(--dark);}
-.piece.white{color:#b8860b;text-shadow:2px 2px 0 #000;}
-.piece.black{color:#000;}
-.side{display:flex;flex-direction:column;gap:12px;}
-.playerPanel{background:#1b1b1b;border:1px solid #2b2b2b;border-radius:10px;padding:10px;text-align:center;}
-.playerName{font-weight:700;font-size:16px;margin-bottom:4px;}
-.timer{font-weight:700;font-size:18px;margin-bottom:6px;}
-.captured{display:flex;justify-content:center;gap:4px;min-height:24px;}
-.moves{background:#1b1b1b;border:1px solid #2b2b2b;border-radius:10px;padding:10px;font-family:monospace;font-size:13px;max-height:200px;overflow:auto;}
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #f0d9b5;
+    margin: 0;
+    padding: 20px;
+  }
+  #player2, #player1 {
+    font-weight: bold;
+    margin: 10px;
+  }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(8, 60px);
+    grid-template-rows: repeat(8, 60px);
+    gap: 0;
+    border: 2px solid #333;
+  }
+  .square {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 36px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .light { background: #f0d9b5; }
+  .dark { background: #b58863; }
+  #timers {
+    display: flex;
+    justify-content: space-between;
+    width: 500px;
+    margin: 10px 0;
+    font-size: 18px;
+    font-weight: bold;
+  }
+  #message {
+    margin-top: 15px;
+    font-size: 20px;
+    color: red;
+  }
 </style>
 </head>
 <body>
-<h1>♞ Chess Arena Pi – Classic 10-min</h1>
 
-<div class="wrap">
-  <div id="board"></div>
-
-  <div class="side">
-    <div class="playerPanel">
-      <div class="playerName" id="p1">Player 1</div>
-      <div class="timer" id="p1Timer">10:00</div>
-      <div class="captured" id="p1Captured"></div>
-    </div>
-    <div class="playerPanel">
-      <div class="playerName" id="p2">Player 2</div>
-      <div class="timer" id="p2Timer">10:00</div>
-      <div class="captured" id="p2Captured"></div>
-    </div>
-    <div class="moves" id="moves"></div>
-  </div>
+<div id="player2">Player 2: [ID]</div>
+<div id="timers">
+  <div>Player1: <span id="timer1">10:00</span></div>
+  <div>Player2: <span id="timer2">10:00</span></div>
 </div>
+<div id="board"></div>
+<div id="player1">Player 1: [ID]</div>
+<div id="message"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
 <script>
-const boardEl=document.getElementById('board');
-const movesEl=document.getElementById('moves');
-const game=new Chess();
-let selected=null;
+const boardEl = document.getElementById('board');
+const messageEl = document.getElementById('message');
+let selected = null;
+let turn = 'w';
+let timer1 = 600, timer2 = 600; // seconds
+let timerInterval = null;
 
-function renderBoard(){
-  boardEl.innerHTML='';
-  const b=game.board();
-  for(let r=0;r<8;r++){
-    for(let c=0;c<8;c++){
-      const sq=document.createElement('div');
-      sq.className='sq '+((r+c)%2?'dark':'light');
-      const square='abcdefgh'[c]+(8-r);
-      const piece=b[r][c];
-      if(piece){
-        const el=document.createElement('div');
-        el.className='piece '+(piece.color==='w'?'white':'black');
-        el.textContent=piece.type==='p'?'♟':
-                        piece.type==='r'?'♜':
-                        piece.type==='n'?'♞':
-                        piece.type==='b'?'♝':
-                        piece.type==='q'?'♛':'♚';
-        sq.appendChild(el);
+// Unicode pieces
+const pieces = {
+  w: { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙' },
+  b: { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟︎' }
+};
+
+// Initial board state
+let board = [
+  ['bR','bN','bB','bQ','bK','bB','bN','bR'],
+  ['bP','bP','bP','bP','bP','bP','bP','bP'],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['wP','wP','wP','wP','wP','wP','wP','wP'],
+  ['wR','wN','wB','wQ','wK','wB','wN','wR']
+];
+
+// Draw board
+function drawBoard() {
+  boardEl.innerHTML = '';
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const sq = document.createElement('div');
+      sq.className = 'square ' + ((r+c)%2 === 0 ? 'light' : 'dark');
+      sq.dataset.row = r;
+      sq.dataset.col = c;
+      if(board[r][c]) {
+        const color = board[r][c][0];
+        const type = board[r][c][1];
+        sq.textContent = pieces[color][type];
       }
-      sq.addEventListener('click',()=>onClickSquare(square));
+      sq.addEventListener('click', () => clickSquare(r, c));
       boardEl.appendChild(sq);
     }
   }
 }
 
-function onClickSquare(square){
-  if(selected){
-    let move={from:selected,to:square,promotion:'q'};
-    const result=game.move(move);
-    if(result){
-      selected=null;
-      renderBoard();
-      updateMoves();
-    } else selected=null;
+// Legal moves check (simplified for demo)
+function clickSquare(r, c) {
+  const piece = board[r][c];
+  if (selected) {
+    const [sr, sc] = selected;
+    if (isLegalMove(sr, sc, r, c)) {
+      movePiece(sr, sc, r, c);
+      selected = null;
+      drawBoard();
+      checkGameState();
+      switchTurn();
+    } else {
+      selected = null;
+    }
   } else {
-    const piece=game.get(square);
-    if(piece && piece.color===game.turn()) selected=square;
+    if (piece && piece[0] === turn) {
+      selected = [r, c];
+    }
   }
 }
 
-function updateMoves(){
-  movesEl.textContent=game.history().join(' ');
+function isLegalMove(sr, sc, r, c) {
+  const piece = board[sr][sc];
+  const target = board[r][c];
+  if(piece[0] !== turn) return false;
+  if(target && target[0] === turn) return false;
+
+  const type = piece[1];
+  const dr = r - sr, dc = c - sc;
+
+  switch(type) {
+    case 'P': // Pawn
+      const dir = piece[0] === 'w' ? -1 : 1;
+      if(dc===0 && dr===dir && !target) return true;
+      if(dc===0 && dr===2*dir && ((sr===6 && turn==='w')||(sr===1 && turn==='b')) && !target && !board[sr+dir][sc]) return true;
+      if(Math.abs(dc)===1 && dr===dir && target && target[0]!==turn) return true; // capture
+      // en passant can be added here
+      return false;
+    case 'R': // Rook
+      if(dr===0 || dc===0) return isClearPath(sr, sc, r, c);
+      return false;
+    case 'N': // Knight
+      return (Math.abs(dr)*Math.abs(dc)===2);
+    case 'B': // Bishop
+      if(Math.abs(dr)===Math.abs(dc)) return isClearPath(sr, sc, r, c);
+      return false;
+    case 'Q': // Queen
+      if(dr===0 || dc===0 || Math.abs(dr)===Math.abs(dc)) return isClearPath(sr, sc, r, c);
+      return false;
+    case 'K': // King
+      if(Math.abs(dr)<=1 && Math.abs(dc)<=1) return true;
+      // castling
+      if(dr===0 && Math.abs(dc)===2) return canCastle(sr, sc, dc>0);
+      return false;
+  }
+  return false;
 }
 
-renderBoard();
-updateMoves();
+function isClearPath(sr, sc, r, c) {
+  const dr = r-sr ? (r>sr?1:-1) : 0;
+  const dc = c-sc ? (c>sc?1:-1) : 0;
+  let x = sr + dr, y = sc + dc;
+  while(x!==r || y!==c){
+    if(board[x][y]) return false;
+    x+=dr; y+=dc;
+  }
+  return true;
+}
 
-/* ----------- Timers ----------- */
-let timers={w:600,b:600};
-const p1TimerEl=document.getElementById('p1Timer');
-const p2TimerEl=document.getElementById('p2Timer');
-setInterval(()=>{
-  if(game.game_over()) return;
-  const turn=game.turn();
-  timers[turn]--;
-  const wMin=Math.floor(timers.w/60), wSec=timers.w%60;
-  const bMin=Math.floor(timers.b/60), bSec=timers.b%60;
-  p1TimerEl.textContent=`${wMin}:${wSec.toString().padStart(2,'0')}`;
-  p2TimerEl.textContent=`${bMin}:${bSec.toString().padStart(2,'0')}`;
-},1000);
+function canCastle(r, c, kingside) {
+  // simplified: assume neither king nor rook has moved and no check
+  if(turn==='w' && r===7 && c===4){
+    if(kingside && !board[7][5] && !board[7][6] && board[7][7]==='wR') return true;
+    if(!kingside && !board[7][1] && !board[7][2] && !board[7][3] && board[7][0]==='wR') return true;
+  }
+  if(turn==='b' && r===0 && c===4){
+    if(kingside && !board[0][5] && !board[0][6] && board[0][7]==='bR') return true;
+    if(!kingside && !board[0][1] && !board[0][2] && !board[0][3] && board[0][0]==='bR') return true;
+  }
+  return false;
+}
+
+function movePiece(sr, sc, r, c){
+  const piece = board[sr][sc];
+  const type = piece[1];
+
+  // Castling
+  if(type==='K' && Math.abs(c-sc)===2){
+    if(c>sc){ // kingside
+      board[r][5]=board[r][7]; board[r][7]='';
+    } else { // queenside
+      board[r][3]=board[r][0]; board[r][0]='';
+    }
+  }
+
+  board[r][c] = piece;
+  board[sr][sc] = '';
+
+  // Pawn promotion
+  if(type==='P' && (r===0 || r===7)) board[r][c] = piece[0]+'Q';
+}
+
+function switchTurn(){
+  turn = turn==='w' ? 'b' : 'w';
+}
+
+function checkGameState(){
+  if(isCheckmate(turn)) messageEl.textContent = (turn==='w'?'Black':'White')+' wins by checkmate!';
+  else if(isStalemate(turn)) messageEl.textContent = 'Stalemate! Draw.';
+}
+
+function isCheckmate(color){
+  // simplified: checks if king exists and no legal moves
+  const moves = getAllLegalMoves(color);
+  if(moves.length===0 && isKingInCheck(color)) return true;
+  return false;
+}
+
+function isStalemate(color){
+  const moves = getAllLegalMoves(color);
+  if(moves.length===0 && !isKingInCheck(color)) return true;
+  return false;
+}
+
+function isKingInCheck(color){
+  // simplified: scan for attacks on king
+  let kr, kc;
+  for(let r=0;r<8;r++){
+    for(let c=0;c<8;c++){
+      if(board[r][c]===color+'K'){ kr=r; kc=c; }
+    }
+  }
+  const enemy = color==='w'?'b':'w';
+  const moves = getAllMoves(enemy);
+  for(const [sr,sc,r,c] of moves){
+    if(r===kr && c===kc) return true;
+  }
+  return false;
+}
+
+function getAllLegalMoves(color){
+  const moves=[];
+  for(let r=0;r<8;r++){
+    for(let c=0;c<8;c++){
+      if(board[r][c] && board[r][c][0]===color){
+        for(let i=0;i<8;i++){
+          for(let j=0;j<8;j++){
+            if(isLegalMove(r,c,i,j)) moves.push([r,c,i,j]);
+          }
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+function getAllMoves(color){
+  const moves=[];
+  for(let r=0;r<8;r++){
+    for(let c=0;c<8;c++){
+      if(board[r][c] && board[r][c][0]===color){
+        for(let i=0;i<8;i++){
+          for(let j=0;j<8;j++){
+            moves.push([r,c,i,j]);
+          }
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+// Timer
+function startTimers(){
+  if(timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(()=>{
+    if(turn==='w') timer1--; else timer2--;
+    document.getElementById('timer1').textContent = formatTime(timer1);
+    document.getElementById('timer2').textContent = formatTime(timer2);
+    if(timer1<=0 || timer2<=0){
+      clearInterval(timerInterval);
+      messageEl.textContent = timer1<=0?'Player 2 wins on time':'Player 1 wins on time';
+    }
+  },1000);
+}
+
+function formatTime(sec){
+  const m = Math.floor(sec/60).toString().padStart(2,'0');
+  const s = (sec%60).toString().padStart(2,'0');
+  return `${m}:${s}`;
+}
+
+drawBoard();
+startTimers();
 </script>
 </body>
 </html>
