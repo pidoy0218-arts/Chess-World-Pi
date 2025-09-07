@@ -87,118 +87,145 @@
     </div>
   </div>
 </div>
-
 <script>
-/* ----------------- Timer & Player ID placeholders ----------------- */
-const player1El = document.createElement('div');
-player1El.textContent = 'Player 1: [ID]';
-player1El.style.fontWeight = '700';
-player1El.style.marginBottom = '4px';
+// ================= Game State ==================
+let currentTurn = 'w';
+let selectedSquare = null;
+let legalMoves = [];
 
-const player2El = document.createElement('div');
-player2El.textContent = 'Player 2: [ID]';
-player2El.style.fontWeight = '700';
-player2El.style.marginBottom = '4px';
+// Timers
+let whiteTime = 300; // 5 min
+let blackTime = 300;
+let whiteTimer, blackTimer;
 
-const timer1El = document.createElement('div');
-timer1El.textContent = '45';
-timer1El.style.fontWeight = '700';
-timer1El.style.color = '#f4b400';
-timer1El.style.marginBottom = '10px';
-
-const timer2El = document.createElement('div');
-timer2El.textContent = '45';
-timer2El.style.fontWeight = '700';
-timer2El.style.color = '#f4b400';
-timer2El.style.marginBottom = '10px';
-
-const sidePanels = document.querySelectorAll('.side');
-sidePanels[0].prepend(timer1El);
-sidePanels[0].prepend(player1El);
-sidePanels[1] && sidePanels[1].prepend(timer2El, player2El); // optional second panel
-
-let timer1 = 45, timer2 = 45, timerInterval;
-
-/* Start timer for both players */
-function startTimer(){
-  clearInterval(timerInterval);
-  timerInterval = setInterval(()=>{
-    if(state.side === 'w'){ timer1--; timer1El.textContent = timer1; if(timer1<=0){ endGame(other(state.side)); } }
-    else { timer2--; timer2El.textContent = timer2; if(timer2<=0){ endGame(other(state.side)); } }
-  },1000);
-}
-startTimer();
-
-/* Reset timers after each move */
-function resetTimers(){
-  timer1 = 45; timer2 = 45;
-  timer1El.textContent = timer1; timer2El.textContent = timer2;
-}
-
-/* ----------------- Game End & Rematch ----------------- */
-function endGame(winnerSide){
-  clearInterval(timerInterval);
-  const winnerText = winnerSide === 'w' ? 'White' : 'Black';
-  statusEl.textContent = winnerText + ' wins!';
-  SND.win(); Confetti.burst(140);
-
-  setTimeout(()=>{
-    const rematch = confirm('Offer rematch to same pair?');
-    if(rematch){
-      payAndRematch(); // placeholder for payment & auto pair
-    } else {
-      redirectLeaderboard();
+function startTimers() {
+  whiteTimer = setInterval(() => {
+    if (currentTurn === 'w') {
+      whiteTime--;
+      updateTimers();
+      if (whiteTime <= 0) endGame('Black wins on time');
     }
-  },3000);
+  }, 1000);
+
+  blackTimer = setInterval(() => {
+    if (currentTurn === 'b') {
+      blackTime--;
+      updateTimers();
+      if (blackTime <= 0) endGame('White wins on time');
+    }
+  }, 1000);
 }
 
-function payAndRematch(){
-  // placeholder logic: detect payment
-  alert('Redirecting to lobby for payment and rematch...');
-  setTimeout(()=>{
-    // after payment & auto-pairing, reset game
-    state = { board: U.clone(START), side:'w', castling:{wk:true,wq:true,bk:true,bq:true}, ep:null, half:0, full:1, hist:[] };
-    selected = null; legal = []; pendingPromotion = null;
-    movesEl.innerHTML = ''; resetTimers(); render(); startTimer();
-  },2000);
+function updateTimers() {
+  document.getElementById("whiteTimer").innerText = formatTime(whiteTime);
+  document.getElementById("blackTimer").innerText = formatTime(blackTime);
 }
 
-function redirectLeaderboard(){
-  alert('Redirecting to leaderboard for personal best and SDK ranking...');
-  // window.location.href = '/leaderboard'; // replace with actual leaderboard URL
+function formatTime(t) {
+  let m = Math.floor(t / 60);
+  let s = t % 60;
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
-/* ----------------- Square click modification to reset timers ----------------- */
-function squareClick(rr,cc){
-  const p = state.board[rr][cc];
-  if(selected){
-    const mv = legal.find(m => m.to.r === rr && m.to.c === cc);
-    if(mv){
-      const ok = makeMove(state, mv, false, null);
-      if(ok){
-        if(pendingPromotion){ render(); return; }
-        logMove(mv); SND.move(); resetTimers();
-        const kp = kingPos(state.board, state.side);
-        if(attacked(state.board, other(state.side), kp.r, kp.c)) SND.check();
-      }
-      selected = null; legal = [];
+// =============== Move Logic ===============
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / sqSize);
+  const y = Math.floor((e.clientY - rect.top) / sqSize);
+  const piece = board[y][x];
+
+  if (selectedSquare) {
+    // Try to move
+    const [sx, sy] = selectedSquare;
+    if (legalMoves.some(m => m[0] === x && m[1] === y)) {
+      makeMove(sx, sy, x, y);
+      currentTurn = currentTurn === 'w' ? 'b' : 'w';
       render();
-      return;
+      checkGameState();
     }
-    if(p && sidePiece(p, state.side)){
-      selected = { r: rr, c: cc };
-      legal = legalMoves(state).filter(m => m.from.r === rr && m.from.c === cc);
-    } else { selected = null; legal = []; }
+    selectedSquare = null;
+    legalMoves = [];
   } else {
-    if(p && sidePiece(p, state.side)){
-      selected = { r: rr, c: cc };
-      legal = legalMoves(state).filter(m => m.from.r === rr && m.from.c === cc);
+    // Select only if correct color
+    if (piece && piece[0] === currentTurn) {
+      selectedSquare = [x, y];
+      legalMoves = generateMoves(x, y, piece);
     }
   }
-  render();
+});
+
+// Dummy move generator (replace with full rules)
+function generateMoves(x, y, piece) {
+  const moves = [];
+  // For now pawns move only forward one square legally
+  if (piece[1] === 'P') {
+    let dir = (piece[0] === 'w') ? -1 : 1;
+    let ny = y + dir;
+    if (board[ny] && !board[ny][x]) moves.push([x, ny]);
+  }
+  // TODO: add rest of FIDE rules
+  return moves;
 }
 
-/* ----------------- Initial draw & start ----------------- */
-render();
-startTimer();
-</script><canvas id="fx"></canvas>
+function makeMove(sx, sy, dx, dy) {
+  board[dy][dx] = board[sy][sx];
+  board[sy][sx] = '';
+}
+
+function checkGameState() {
+  // TODO: Add check, checkmate, stalemate detection
+}
+
+// ============= End Game ==============
+function endGame(message) {
+  clearInterval(whiteTimer);
+  clearInterval(blackTimer);
+  alert(message);
+
+  setTimeout(() => {
+    showRematchPopup();
+  }, 3000);
+}
+
+function showRematchPopup() {
+  const popup = document.createElement('div');
+  popup.style.position = 'fixed';
+  popup.style.top = '50%';
+  popup.style.left = '50%';
+  popup.style.transform = 'translate(-50%, -50%)';
+  popup.style.background = '#fff';
+  popup.style.padding = '20px';
+  popup.style.border = '2px solid #333';
+  popup.innerHTML = `
+    <p>Rematch?</p>
+    <button id="yesBtn">Yes</button>
+    <button id="noBtn">No</button>
+  `;
+  document.body.appendChild(popup);
+
+  let timeout = setTimeout(() => {
+    document.body.removeChild(popup);
+    redirectLeaderboard();
+  }, 5000);
+
+  document.getElementById("yesBtn").onclick = () => {
+    clearTimeout(timeout);
+    location.reload(); // reset game
+  };
+  document.getElementById("noBtn").onclick = () => {
+    clearTimeout(timeout);
+    document.body.removeChild(popup);
+    redirectLeaderboard();
+  };
+}
+
+function redirectLeaderboard() {
+  window.location.href = "leaderboard.html"; 
+}
+
+// Start game
+startTimers();
+updateTimers();
+
+</script>
+<canvas id="fx"></canvas>
