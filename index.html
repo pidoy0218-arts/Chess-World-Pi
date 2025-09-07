@@ -1,216 +1,194 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chess Arena Pi – Classic Match</title>
+<meta charset="utf-8" />
+<title>CHESS ARENA for PI — FIDE Legal (Auto-Queen Promotion)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
-  body {
-    margin: 0;
-    padding: 0;
-    font-family: Arial, sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    background: #222;
-    color: white;
-    flex-direction: column;
-  }
-
-  /* Loader */
-  .loader {
-    position: relative;
-    width: 100px;
-    height: 100px;
-    margin-bottom: 25px;
-  }
-  .pi-symbol {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 32px;
-    color: gold;
-    font-weight: bold;
-  }
-  .orbit-dot {
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    background: gold;
-    border-radius: 50%;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(0deg) translate(45px);
-    animation: orbit 2s linear infinite;
-  }
-  .orbit-dot:nth-child(1) { animation-delay: 0s; }
-  .orbit-dot:nth-child(2) { animation-delay: -0.25s; }
-  .orbit-dot:nth-child(3) { animation-delay: -0.5s; }
-  .orbit-dot:nth-child(4) { animation-delay: -0.75s; }
-  .orbit-dot:nth-child(5) { animation-delay: -1s; }
-  .orbit-dot:nth-child(6) { animation-delay: -1.25s; }
-  .orbit-dot:nth-child(7) { animation-delay: -1.5s; }
-  .orbit-dot:nth-child(8) { animation-delay: -1.75s; }
-
-  @keyframes orbit {
-    from { transform: translate(-50%, -50%) rotate(0deg) translate(45px); }
-    to   { transform: translate(-50%, -50%) rotate(360deg) translate(45px); }
-  }
-
-  /* Buttons */
-  .button-container {
-    display: none;
-    flex-direction: column;
-    gap: 12px;
-    width: 220px;
-  }
-  button {
-    padding: 12px;
-    font-size: 14px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    background: #2196f3;
-    color: white;
-    transition: 0.3s;
-    width: 100%;
-  }
-  button:hover {
-    background: #0b79d0;
-  }
-
-  /* Modal */
-  .modal {
-    display: none;
-    position: fixed;
-    z-index: 999;
-    left: 0; top: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.8);
-    justify-content: center;
-    align-items: center;
-  }
-  .modal-content {
-    background: #333;
-    padding: 20px;
-    border-radius: 12px;
-    text-align: center;
-    color: white;
-  }
-  .modal-content button {
-    margin-top: 10px;
-  }
+  :root{ --bg:#111; --fg:#eee; --light:#f0f0f0; --dark:#b1e59f; --sel:#ffcc00; --hint:#5ac8fa; --accent:#f4b400; --warn:#ff5252 }
+  body{ margin:0; background:var(--bg); color:var(--fg); font-family:system-ui,Arial; display:flex;flex-direction:column;align-items:center;padding:16px; }
+  h1{margin:6px 0 2px;font-size:20px}
+  .sub{opacity:.75;font-size:12px;margin-bottom:8px}
+  .wrap{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;justify-content:center;width:100%;max-width:1100px}
+  #board{ display:grid; grid-template-columns:repeat(8,min(10.5vw,66px)); grid-template-rows:repeat(8,min(10.5vw,66px)); border:6px solid #333; border-radius:10px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,.45); }
+  .sq{ display:flex;align-items:center;justify-content:center;font-size:min(8vw,50px);cursor:pointer; }
+  .sq.light{ background:var(--light); } .sq.dark{ background:var(--dark); }
+  .piece.white{ color:#b8860b; text-shadow:2px 2px 0 #000; font-weight:900 } .piece.black{ color:#000 }
+  .sq.sel{ outline:3px solid var(--sel); outline-offset:-3px }
+  .sq.hint::after{ content:""; width:22%; height:22%; border-radius:50%; background:var(--hint); opacity:.85; display:block; }
+  .sq.cap{ box-shadow: inset 0 0 0 4px var(--warn); }
+  .side{ min-width:260px; max-width:360px; display:flex; flex-direction:column; gap:10px }
+  .panel{ background:#1b1b1b; border:1px solid #2b2b2b; border-radius:10px; padding:10px 12px }
+  .row{ display:flex; justify-content:space-between; align-items:center; gap:10px }
+  .btn{ padding:10px 12px; border-radius:8px; border:0; color:#111; background:var(--accent); font-weight:700; cursor:pointer }
+  .tiny{ font-size:12px; opacity:.8 }
+  .moves{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.45; max-height:260px; overflow:auto }
+  .modal{ position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:10 }
+  .modal.show{ display:flex }
+  .card{ background:#1e1e1e; border:1px solid #2d2d2d; padding:16px; border-radius:12px; min-width:260px }
+  .grid4{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:10px }
+  .pick{ font-size:34px; padding:10px; border-radius:10px; border:1px solid #333; background:#121212; color:#fff; cursor:pointer }
+  #fx{ position:fixed; inset:0; pointer-events:none; z-index:9 }
 </style>
 </head>
 <body>
+<h1>♞ CHESS ARENA for PI</h1>
+<div class="sub">FIDE-legal: castling • en passant • promotion • check/checkmate • auto-queen promotion</div>
 
-<!-- Loader -->
-<div class="loader" id="loader">
-  <div class="pi-symbol">π</div>
-  <div class="orbit-dot"></div>
-  <div class="orbit-dot"></div>
-  <div class="orbit-dot"></div>
-  <div class="orbit-dot"></div>
-  <div class="orbit-dot"></div>
-  <div class="orbit-dot"></div>
-  <div class="orbit-dot"></div>
-  <div class="orbit-dot"></div>
-</div>
+<div class="wrap">
+  <div id="board" aria-label="chessboard"></div>
 
-<!-- Buttons -->
-<div class="button-container" id="buttons">
-  <button onclick="inviteMatch()">© Invite</button>
-  <button onclick="randomMatch()">© Random</button>
-  <button onclick="aiMatch()">© AI</button>
-</div>
+  <div class="side">
+    <!-- Pi SDK Player IDs + Timers -->
+    <div class="panel">
+      <div class="row">
+        <div><b>Player 1:</b> <span id="player1">[PiID]</span></div>
+        <div id="timer1" class="tiny">45s</div>
+      </div>
+      <div class="row">
+        <div><b>Player 2:</b> <span id="player2">[PiID]</span></div>
+        <div id="timer2" class="tiny">45s</div>
+      </div>
+    </div>
 
-<!-- AI Modal -->
-<div class="modal" id="aiModal">
-  <div class="modal-content">
-    <h3>Play vs AI</h3>
-    <button onclick="payAI()">💰 Pay with Pi</button>
-    <button onclick="watchAd()">🎥 Watch Ad</button>
-    <button onclick="closeModal('aiModal')">Cancel</button>
+    <div class="panel">
+      <div class="row">
+        <div id="status" style="font-weight:700">White to move</div>
+        <div id="incheck" style="display:none;padding:4px 8px;border-radius:8px;background:#2b2b2b">Check!</div>
+      </div>
+      <div class="row tiny"><div>Castling: <span id="cr">KQkq</span></div><div>En Passant: <span id="ep">—</span></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="row"><div><b>Move List</b></div><button class="btn" id="undoBtn" title="Undo last move">Undo</button></div>
+      <div id="moves" class="moves"></div>
+    </div>
+
+    <div class="panel row">
+      <button class="btn" id="resetBtn">Reset</button>
+      <button class="btn" id="flipBtn">Flip</button>
+      <div class="tiny">Click a piece → click a target square</div>
+    </div>
   </div>
 </div>
 
-<!-- Pi SDK -->
-<script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<div id="promo" class="modal" role="dialog" aria-modal="true">
+  <div class="card">
+    <div style="font-weight:700;margin-bottom:6px">Promote pawn to:</div>
+    <div class="grid4">
+      <button class="pick" data-piece="q">♛</button>
+      <button class="pick" data-piece="r">♜</button>
+      <button class="pick" data-piece="b">♝</button>
+      <button class="pick" data-piece="n">♞</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="fx"></canvas>
+
 <script>
-  // Init Pi SDK
-  Pi.init({ version: "2.0", sandbox: true, appId: "chess-world-pi" });
+/* ------------------ Config ------------------ */
+const AUTO_PROMOTE = true; 
 
-  setTimeout(() => {
-    document.getElementById('loader').style.display = 'none';
-    document.getElementById('buttons').style.display = 'flex';
-  }, 4000);
-
-  function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-  function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
-  // === Invite ===
-  function inviteMatch() {
-    Pi.createPayment({
-      amount: 0.25,
-      memo: "Invite Match",
-      metadata: { mode: "invite" }
-    }, {
-      onReadyForServerApproval: (paymentId) => {
-        console.log("Invite payment ready", paymentId);
-      },
-      onReadyForServerCompletion: (paymentId, txid) => {
-        console.log("Invite payment done", paymentId, txid);
-        window.location.href = "game.html?mode=invite";
-      },
-      onCancel: () => alert("❌ Invite cancelled"),
-      onError: (err) => alert("⚠️ " + err)
-    });
+/* -------------- Sound (WebAudio) -------------- */
+const SND = (() => {
+  let ctx;
+  function beep(freq=600, dur=0.08, type='square', vol=0.05){
+    try{
+      ctx = ctx || new (window.AudioContext||window.webkitAudioContext)();
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type; o.frequency.value = freq; g.gain.value = vol;
+      o.connect(g); g.connect(ctx.destination); o.start();
+      setTimeout(()=> o.stop(), dur*1000);
+    }catch(e){}
   }
+  return {
+    move:()=>beep(640,0.07,'square',0.05),
+    capture:()=>{beep(220,0.05,'sawtooth',0.06); setTimeout(()=>beep(180,0.09,'sawtooth',0.05),60);},
+    check:()=>beep(900,0.12,'triangle',0.06),
+    win:()=>{ [880,988,1175].forEach((f,i)=>setTimeout(()=>beep(f,0.12,'triangle',0.08), i*120)); }
+  };
+})();
 
-  // === Random ===
-  function randomMatch() {
-    Pi.createPayment({
-      amount: 0.25,
-      memo: "Random Match",
-      metadata: { mode: "random" }
-    }, {
-      onReadyForServerCompletion: (paymentId, txid) => {
-        console.log("Random paired", paymentId, txid);
-        window.location.href = "game.html?mode=random";
-      },
-      onCancel: () => alert("❌ Random cancelled"),
-      onError: (err) => alert("⚠️ " + err)
-    });
+/* ---------------- Confetti ---------------- */
+const Confetti = (() => {
+  const c = document.getElementById('fx'), x = c.getContext('2d');
+  let parts=[], run=false, w=0,h=0;
+  function resize(){ w=c.width=innerWidth; h=c.height=innerHeight; }
+  addEventListener('resize', resize); resize();
+  function burst(n=120){
+    parts=[]; for(let i=0;i<n;i++) parts.push({ x:w/2, y:h*0.25, vx:(Math.random()*2-1)*6, vy:(Math.random()*-6-2), g:Math.random()*0.18+0.12, s:Math.random()*6+3, a:Math.random()*Math.PI, col:`hsl(${Math.random()*360},90%,60%)` });
+    if(!run){ run=true; requestAnimationFrame(loop); }
   }
-
-  // === AI ===
-  function aiMatch() { openModal('aiModal'); }
-
-  function payAI() {
-    Pi.createPayment({
-      amount: 0.1,
-      memo: "AI Match (paid)",
-      metadata: { mode: "ai", method: "pay" }
-    }, {
-      onReadyForServerCompletion: () => {
-        window.location.href = "ai.html?method=pay";
-      },
-      onCancel: () => alert("❌ AI payment cancelled"),
-      onError: (err) => alert("⚠️ " + err)
-    });
-    closeModal('aiModal');
+  function loop(){
+    x.clearRect(0,0,w,h);
+    for(const p of parts){ p.vy += p.g; p.x += p.vx; p.y += p.vy; p.a += 0.2; x.save(); x.translate(p.x,p.y); x.rotate(p.a); x.fillStyle=p.col; x.fillRect(-p.s/2,-p.s/2,p.s,p.s); x.restore(); }
+    parts = parts.filter(p=>p.y<h+30);
+    if(parts.length) requestAnimationFrame(loop); else run=false;
   }
+  return { burst };
+})();
 
-  function watchAd() {
-    alert("🎥 Watching Ad...");
-    setTimeout(() => {
-      alert("✅ Ad finished. Starting AI match.");
-      window.location.href = "ai.html?method=ad";
-    }, 4000);
-    closeModal('aiModal');
-  }
-</script>
-</body>
-</html>
+/* ----------------- Utilities ----------------- */
+const U = {
+  inBounds:(r,c)=>r>=0 && r<8 && c>=0 && c<8,
+  clone:(o)=>JSON.parse(JSON.stringify(o)),
+  toAlg:(r,c)=>"abcdefgh"[c] + (8 - r),
+  fromAlg:(a)=>({ r: 8 - parseInt(a[1],10), c: "abcdefgh".indexOf(a[0]) })
+};
+
+/* ----------------- Chess Core ----------------- */
+const START = [
+  ["r","n","b","q","k","b","n","r"],
+  ["p","p","p","p","p","p","p","p"],
+  ["","","","","","","",""],
+  ["","","","","","","",""],
+  ["","","","","","","",""],
+  ["","","","","","","",""],
+  ["P","P","P","P","P","P","P","P"],
+  ["R","N","B","Q","K","B","N","R"]
+];
+
+let state = {
+  board: U.clone(START),
+  side: 'w',
+  castling: { wk:true, wq:true, bk:true, bq:true },
+  ep: null,
+  half:0, full:1,
+  hist: []
+};
+
+/* ----------------- Timers ----------------- */
+let timers = { w:45, b:45 };
+let timerInterval = null;
+function startTimer(){
+  clearInterval(timerInterval);
+  timerInterval = setInterval(()=>{
+    const side = state.side;
+    timers[side]--;
+    updateTimerDisplay();
+    if(timers[side] <= 0){
+      clearInterval(timerInterval);
+      alert(`${side==='w'?'White':'Black'} ran out of time! Move forfeited.`);
+      resetBoard();
+    }
+  },1000);
+}
+function resetTimer(side){ timers[side]=45; updateTimerDisplay(); }
+function updateTimerDisplay(){
+  document.getElementById('timer1').textContent = timers['w']+'s';
+  document.getElementById('timer2').textContent = timers['b']+'s';
+}
+function moveMade(){ 
+  const movedSide = state.side==='w'?'b':'w';
+  resetTimer(movedSide); startTimer(); 
+}
+function resetBoard(){
+  state = { board: U.clone(START), side:'w', castling:{wk:true,wq:true,bk:true,bq:true}, ep:null, half:0, full:1, hist:[] };
+  selected = null; legal = []; pendingPromotion = null;
+  movesEl.innerHTML=''; timers={w:45,b:45};
+  render(); startTimer();
+}
+
+/* ---------------- UI glue ---------------- */
+const PIECES = { r:"♜", n:"♞", b:"♝", q:"♛", k:"♚", p:"♟", R
