@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess Arena Pi – Quick Match</title>
+<style>
+  body { margin:0; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; background:#f0e6d2; }
+  #gameContainer { display:flex; flex-direction:column; align-items:center; margin-top:10px; }
+  #board { display:grid; grid-template-columns:repeat(8, 50px); grid-template-rows:repeat(8,50px); }
+  .square { width:50px; height:50px; display:flex; justify-content:center; align-items:center; font-size:32px; cursor:pointer; }
+  .white { background:#f0d9b5; }
+  .black { background:#b58863; }
+  .selected { outline:3px solid red; }
+  #statusEl { margin-top:10px; font-weight:bold; }
+  .panel { margin-top:8px; display:flex; gap:6px; }
+  .btn { padding:6px 12px; border:none; border-radius:6px; background:#480082; color:#fff; cursor:pointer; }
+  #drawPopup { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    background:#222; color:#eee; padding:16px; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.5); z-index:100; }
+</style>
+</head>
+<body>
+
+<h2>Chess Arena Pi</h2>
+
+<div id="gameContainer">
+  <div id="board"></div>
+  <div id="statusEl">White to move</div>
+  <div class="panel">
+    <button class="btn" id="resignBtn">Resign</button>
+    <button class="btn" id="flipBtn">Flip</button>
+    <button class="btn" id="offerDrawBtn">Offer Draw</button>
+  </div>
+</div>
+
+<!-- Draw popup -->
+<div id="drawPopup">
+  <div id="drawText">Opponent offered a draw.</div>
+  <div style="margin-top:12px;display:flex;justify-content:center;gap:10px">
+    <button class="btn" id="acceptDrawBtn">Accept</button>
+    <button class="btn" id="declineDrawBtn">Decline</button>
+  </div>
+</div>
+
+<script>
+const boardEl = document.getElementById('board');
+const statusEl = document.getElementById('statusEl');
+const resignBtn = document.getElementById('resignBtn');
+const flipBtn = document.getElementById('flipBtn');
+const offerDrawBtn = document.getElementById('offerDrawBtn');
+const drawPopup = document.getElementById('drawPopup');
+const acceptDrawBtn = document.getElementById('acceptDrawBtn');
+const declineDrawBtn = document.getElementById('declineDrawBtn');
+
+const pieces = {
+  'r':'♜','n':'♞','b':'♝','q':'♛','k':'♚','p':'♟',
+  'R':'♖','N':'♘','B':'♗','Q':'♕','K':'♔','P':'♙'
+};
+
+// Initial board position
+let state = {
+  board:[
+    ['r','n','b','q','k','b','n','r'],
+    ['p','p','p','p','p','p','p','p'],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['P','P','P','P','P','P','P','P'],
+    ['R','N','B','Q','K','B','N','R']
+  ],
+  side:'w', selected:null, gameOver:false
+};
+
+function renderBoard(){
+  boardEl.innerHTML='';
+  for(let r=0;r<8;r++){
+    for(let c=0;c<8;c++){
+      const sq=document.createElement('div');
+      sq.className='square '+((r+c)%2===0?'white':'black');
+      sq.textContent=pieces[state.board[r][c]]||'';
+      sq.dataset.row=r;
+      sq.dataset.col=c;
+      sq.addEventListener('click',onClickSquare);
+      boardEl.appendChild(sq);
+    }
+  }
+}
+
+function onClickSquare(e){
+  if(state.gameOver) return;
+  const r=parseInt(e.target.dataset.row);
+  const c=parseInt(e.target.dataset.col);
+  const piece=state.board[r][c];
+  if(state.selected){
+    const [sr,sc]=state.selected;
+    // simple move without legality check
+    state.board[r][c]=state.board[sr][sc];
+    state.board[sr][sc]='';
+    state.selected=null;
+    state.side=state.side==='w'?'b':'w';
+    statusEl.textContent=state.side==='w'?"White to move":"Black to move";
+    renderBoard();
+  }else{
+    if(piece && ((state.side==='w' && piece===piece.toUpperCase())||(state.side==='b' && piece===piece.toLowerCase()))){
+      state.selected=[r,c];
+      e.target.classList.add('selected');
+    }
+  }
+}
+
+resignBtn.addEventListener('click',()=>{
+  state.gameOver=true;
+  statusEl.textContent=(state.side==='w'?'White':'Black')+' resigned.';
+});
+
+flipBtn.addEventListener('click',()=>{
+  state.board.reverse().forEach(r=>r.reverse());
+  renderBoard();
+});
+
+// Draw offer logic
+offerDrawBtn.addEventListener('click',()=>{
+  drawPopup.style.display='block';
+  document.getElementById('drawText').textContent="You offered a draw.";
+});
+
+acceptDrawBtn.addEventListener('click',()=>{
+  drawPopup.style.display='none';
+  state.gameOver=true;
+  statusEl.textContent="Game drawn by agreement.";
+});
+
+declineDrawBtn.addEventListener('click',()=>{
+  drawPopup.style.display='none';
+  statusEl.textContent=state.side==='w'?"White to move":"Black to move";
+});
+
+renderBoard();
+</script>
+</body>
+</html><script>
+// ======= Advanced Game Logic =======
+const capturedWhite = [];
+const capturedBlack = [];
+
+const moveSounds = {
+  move: new Audio('https://freesound.org/data/previews/341/341695_6241-lq.mp3'), // tap move
+  capture: new Audio('https://freesound.org/data/previews/256/256113_4486188-lq.mp3'), // capture
+  win: new Audio('https://freesound.org/data/previews/522/522488_5674468-lq.mp3'), // win
+  lose: new Audio('https://freesound.org/data/previews/522/522487_5674468-lq.mp3'), // lose
+});
+
+// Captured pieces container
+const capturedContainer = document.createElement('div');
+capturedContainer.style.display='flex';
+capturedContainer.style.justifyContent='space-between';
+capturedContainer.style.width='420px';
+capturedContainer.style.marginTop='6px';
+
+const capturedWhiteEl = document.createElement('div');
+const capturedBlackEl = document.createElement('div');
+capturedContainer.appendChild(capturedWhiteEl);
+capturedContainer.appendChild(capturedBlackEl);
+document.getElementById('gameContainer').appendChild(capturedContainer);
+
+function updateCapturedDisplay(){
+  capturedWhiteEl.textContent='White Captured: '+capturedWhite.map(p=>pieces[p]).join(' ');
+  capturedBlackEl.textContent='Black Captured: '+capturedBlack.map(p=>pieces[p]).join(' ');
+}
+
+// ======= Move Legality & Check =======
+function isLegalMove(sr,sc,tr,tc){
+  const piece=state.board[sr][sc];
+  if(!piece) return false;
+  const target=state.board[tr][tc];
+  if(target && ((piece===piece.toUpperCase() && target===target.toUpperCase()) || (piece===piece.toLowerCase() && target===target.toLowerCase()))) return false;
+  
+  // Simplified piece move rules
+  const dr=tr-sr;
+  const dc=tc-sc;
+  const absdr=Math.abs(dr);
+  const absdc=Math.abs(dc);
+
+  switch(piece.toLowerCase()){
+    case 'p':
+      if(piece==='P'){
+        if(dr===-1 && dc===0 && !target) return true;
+        if(sr===6 && dr===-2 && dc===0 && !target && !state.board[sr-1][sc]) return true;
+        if(dr===-1 && Math.abs(dc)===1 && target && target===target.toLowerCase()) return true;
+      }else{
+        if(dr===1 && dc===0 && !target) return true;
+        if(sr===1 && dr===2 && dc===0 && !target && !state.board[sr+1][sc]) return true;
+        if(dr===1 && Math.abs(dc)===1 && target && target===target.toUpperCase()) return true;
+      }
+      return false;
+    case 'r': return (dr===0||dc===0);
+    case 'b': return absdr===absdc;
+    case 'q': return (dr===0||dc===0||absdr===absdc);
+    case 'k': return absdr<=1 && absdc<=1;
+    case 'n': return (absdr===2 && absdc===1)||(absdr===1 && absdc===2);
+  }
+  return true;
+}
+
+function checkWin(){
+  let kings={w:false,b:false};
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    if(state.board[r][c]==='K') kings.w=true;
+    if(state.board[r][c]==='k') kings.b=true;
+  }
+  if(!kings.w){state.gameOver=true; statusEl.textContent="Black wins!"; moveSounds.win.play();}
+  if(!kings.b){state.gameOver=true; statusEl.textContent="White wins!"; moveSounds.win.play();}
+}
+
+// ======= Modified onClickSquare =======
+function onClickSquare(e){
+  if(state.gameOver) return;
+  const r=parseInt(e.target.dataset.row);
+  const c=parseInt(e.target.dataset.col);
+  const piece=state.board[r][c];
+  if(state.selected){
+    const [sr,sc]=state.selected;
+    if(isLegalMove(sr,sc,r,c)){
+      // Capture logic
+      const target=state.board[r][c];
+      if(target){
+        if(target===target.toUpperCase()) capturedWhite.push(target);
+        else capturedBlack.push(target);
+        moveSounds.capture.play();
+      }else moveSounds.move.play();
+      // Move
+      state.board[r][c]=state.board[sr][sc];
+      state.board[sr][sc]='';
+      // Promotion
+      if(state.board[r][c]==='P' && r===0) state.board[r][c]='Q';
+      if(state.board[r][c]==='p' && r===7) state.board[r][c]='q';
+
+      state.selected=null;
+      state.side=state.side==='w'?'b':'w';
+      statusEl.textContent=state.side==='w'?"White to move":"Black to move";
+      updateCapturedDisplay();
+      renderBoard();
+      checkWin();
+    }else{
+      state.selected=null;
+      renderBoard();
+    }
+  }else{
+    if(piece && ((state.side==='w' && piece===piece.toUpperCase())||(state.side==='b' && piece===piece.toLowerCase()))){
+      state.selected=[r,c];
+      renderBoard();
+      e.target.classList.add('selected');
+    }
+  }
+}
+
+// ======= Sounds preloaded =======
+for(let key in moveSounds){moveSounds[key].load();}
+</script>
