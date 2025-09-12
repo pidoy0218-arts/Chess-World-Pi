@@ -822,6 +822,28 @@ window.ChessArenaPi = {
   // allow external trigger for draw offers if desired
   requestDrawOffer: function(side){ sendDrawOfferToPi(side); }
 };
+<script>
+  // ----- WebSocket Setup -----
+const ws = new WebSocket('ws://localhost:3000'); // replace with your server URL
+
+ws.onopen = () => console.log('Connected to WS server');
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === 'move') {
+    const { from, to, promotion } = data;
+    makeMove(from, to, promotion, true); // true = opponent move
+  }
+};
+
+ws.onclose = () => console.log('Disconnected from WS server');
+ws.onerror = (err) => console.error('WebSocket error:', err);
+
+// ----- Hook into your existing move handler -----
+function handlePlayerMove(from, to, promotion = null) {
+  makeMove(from, to, promotion);      // your full existing logic
+  ws.send(JSON.stringify({ type: 'move', from, to, promotion }));
+}
 </script>
 </body>
 </html>
