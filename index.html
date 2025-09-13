@@ -8,7 +8,7 @@
   :root {
     --light-square: #d9f0c1; /* light green */
     --dark-square: #ffffff;   /* white */
-    --white-piece: #d3d3d3;   /* light gray solid */
+    --white-piece: #c1b280;   /* solid khaki */
     --black-piece: #000000;   /* solid black */
     --highlight: #ffcc00;
   }
@@ -160,6 +160,7 @@ function attemptMove(from,toR,toC){
   const piece = board[r][c];
   if(!piece) return false;
   if(!isLegalMove(r,c,toR,toC,piece)) return false;
+
   // capture
   if(board[toR][toC]){
     const cap = board[toR][toC];
@@ -167,14 +168,22 @@ function attemptMove(from,toR,toC){
     else capturedPieces.black.push(cap);
     updateCaptured();
   }
+
+  // Move piece
   board[toR][toC] = piece;
   board[r][c] = '';
+
   moveSound.play();
   return true;
 }
 
-// Placeholder for real FIDE move logic
-function isLegalMove(r,c,toR,toC,piece){ return true; }
+// Placeholder FIDE logic
+function isLegalMove(r,c,toR,toC,piece){ 
+  // Prevent moving on same color
+  const target = board[toR][toC];
+  if(target && target[0] === piece[0]) return false;
+  return true;
+}
 
 function updateCaptured(){
   whiteCapturedEl.textContent = capturedPieces.white.map(p=>PIECES[p]).join(' ');
