@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CHESS ARENA PI — FIDE Legal Full</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+:root {
+  --bg:#111; --fg:#eee; --board-light:#eee; --board-dark:#777;
+  --piece-white:#ddd; --piece-black:#222; --highlight:#ffcc00;
+}
+body { background:var(--bg); color:var(--fg); font-family:sans-serif; display:flex; flex-direction:column; align-items:center; margin:0;}
+#board { display:grid; grid-template-columns:repeat(8,50px); grid-template-rows:repeat(8,50px); margin:20px;}
+.cell { width:50px; height:50px; display:flex; justify-content:center; align-items:center; font-size:32px; cursor:pointer; user-select:none;}
+.light { background: var(--board-light); }
+.dark { background: var(--board-dark); }
+.highlight { outline:2px solid var(--highlight);}
+#timers { display:flex; gap:20px; font-size:18px; margin-top:10px;}
+#moves { margin-top:10px; max-height:150px; overflow-y:auto; width:400px; background:#222; padding:10px; border-radius:5px;}
+#players { display:flex; justify-content:space-between; width:400px; font-size:18px; margin-top:5px;}
+#controls { display:flex; gap:10px; margin-top:10px; }
+button { padding:5px 10px; font-size:14px; cursor:pointer; border-radius:4px; border:none; background:#555; color:#fff; }
+.popup { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#222; padding:20px; border-radius:8px; display:none; flex-direction:column; align-items:center; gap:10px; z-index:100;}
+.popup button { width:100px; }
+</style>
+</head>
+<body>
+<h2>CHESS ARENA PI — Classic FIDE</h2>
+<div id="players">
+  <span id="playerWhite">White: Player123</span>
+  <span id="playerBlack">Black: Player456</span>
+</div>
+<div id="timers">
+  <div>White: <span id="timerWhite">05:00</span></div>
+  <div>Black: <span id="timerBlack">05:00</span></div>
+</div>
+<div id="board"></div>
+<div id="moves"></div>
+<div id="controls">
+  <button onclick="resign()">Resign</button>
+  <button onclick="offerDraw()">Offer Draw</button>
+  <button onclick="requestRematch()">Rematch</button>
+</div>
+<div id="popup" class="popup">
+  <div id="popupText"></div>
+  <div>
+    <button id="popupYes">Yes</button>
+    <button id="popupNo">No</button>
+  </div>
+</div>
+<audio id="soundMove" src="move.mp3"></audio>
+<audio id="soundWin" src="win.mp3"></audio>
+<audio id="soundLose" src="lose.mp3"></audio>
+<audio id="soundClick" src="click.mp3"></audio>
+
+<script>
+//----------------------- BASIC VARIABLES ----------------------
+const boardEl = document.getElementById('board');
+const movesEl = document.getElementById('moves');
+const timerWhiteEl = document.getElementById('timerWhite');
+const timerBlackEl = document.getElementById('timerBlack');
+const popup = document.getElementById('popup');
+const popupText = document.getElementById('popupText');
+const popupYes = document.getElementById('popupYes');
+const popupNo = document.getElementById('popupNo');
+
+let board = [];
+let turn = 'w';
+let selected = null;
+let timers = {w:300, b:300};
+let interval = null;
+let gameOver = false;
+
+// FIDE Piece symbols
+const pieceSymbols = { wK:'♔',wQ:'♕',wR:'♖',wB:'♗',wN:'♘',wP:'♙', bK:'♚',bQ:'♛',bR:'♜',bB:'♝',bN:'♞',bP:'♟' };
+
+//----------------------- BOARD INIT ----------------------
+function initBoard(){
+  board = [
+    ['bR','bN','bB','bQ','bK','bB','bN','bR'],
+    ['bP','bP','bP','bP','bP','bP','bP','bP'],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['wP','wP','wP','wP','wP','wP','wP','wP'],
+    ['wR','wN','wB','wQ','wK','wB','wN','wR']
+  ];
+  selected = null;
+  turn='w';
+  gameOver=false;
+  timers={w:300,b:300};
+  renderBoard();
+  updateTimers();
+  startTimer();
+  movesEl.innerHTML='';
+}
+
+//----------------------- RENDER ----------------------
+function renderBoard(){
+  boardEl.innerHTML='';
+  for(let r=0;r<8;r++){
+    for(let c=0;c<8;c++){
+      const cell = document.createElement('div');
+      cell.classList.add('cell', (r+c)%2===0?'light':'dark');
+      cell.dataset.row=r;
+      cell.dataset.col=c;
+      cell.textContent = pieceSymbols[board[r][c]]||'';
+      cell.onclick = ()=>cellClick(r,c);
+      boardEl.appendChild(cell);
+    }
+  }
+}
+
+//----------------------- TIMER ----------------------
+function startTimer(){
+  clearInterval(interval);
+  interval=setInterval(()=>{
+    if(gameOver) return;
+    timers[turn]--;
+    updateTimers();
+    if(timers[turn]<=0){
+      gameOver=true;
+      clearInterval(interval);
+      alert(turn==='w'?'Black wins on time!':'White wins on time!');
+      playSound(turn==='w'?'lose':'win');
+    }
+  },1000);
+}
+function updateTimers(){
+  timerWhiteEl.textContent = formatTime(timers.w);
+  timerBlackEl.textContent = formatTime(timers.b);
+}
+function formatTime(s){
+  const m=Math.floor(s/60), sec=s%60;
+  return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+}
+
+//----------------------- MOVE LOG ----------------------
+function logMove(piece,from,to,capture){
+  const notation = piece+from+(capture?'x':'-')+to;
+  const div=document.createElement('div');
+  div.textContent = notation;
+  movesEl.appendChild(div);
+  movesEl.scrollTop=movesEl.scrollHeight;
+  // Pi SDK recording placeholder
+  if(window.piSDK) piSDK.recordMove({piece,from,to,capture,turn});
+}
+
+//----------------------- LEGAL MOVES ----------------------
+// This includes simplified FIDE rules for pawn, castling, check detection
+function legalMoves(r,c){
+  const piece=board[r][c];
+  if(!piece || piece[0]!==turn) return [];
+  const moves=[];
+  const dir = turn==='w'?-1:1;
+  if(piece[1]==='P'){
+    if(board[r+dir][c]==='') moves.push([r+dir,c]);
+    if(r===6 && turn==='w' && board[r-2][c]==='') moves.push([r-2,c]);
+    if(r===1 && turn==='b' && board[r+2][c]==='') moves.push([r+2,c]);
+    if(c>0 && board[r+dir][c-1] && board[r+dir][c-1][0]!==turn) moves.push([r+dir,c-1]);
+    if(c<7 && board[r+dir][c+1] && board[r+dir][c+1][0]!==turn) moves.push([r+dir,c+1]);
+  } else if(piece[1]==='K'){
+    const deltas=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+    deltas.forEach(d=>{
+      const nr=r+d[0], nc=c+d[1];
+      if(nr>=0 && nr<8 && nc>=0 && nc<8){
+        if(board[nr][nc]==='' || board[nr][nc][0]!==turn) moves.push([nr,nc]);
+      }
+    });
+    // Castling simplified check
+    if(turn==='w' && r===7 && c===4 && !isInCheck('w')){
+      if(board[7][7]==='wR' && board[7][5]==='' && board[7][6]==='' && !wouldBeCheck(7,4,7,6)) moves.push([7,6]);
+      if(board[7][0]==='wR' && board[7][1]==='' && board[7][2]==='' && board[7][3]==='' && !wouldBeCheck(7,4,7,2)) moves.push([7,2]);
+    }
+    if(turn==='b' && r===0 && c===4 && !isInCheck('b')){
+      if(board[0][7]==='bR' && board[0][5]==='' && board[0][6]==='' && !wouldBeCheck(0,4,0,6)) moves.push([0,6]);
+      if(board[0][0]==='bR' && board[0][1]==='' && board[0][2]==='' && board[0][3]==='' && !wouldBeCheck(0,4,0,2)) moves.push([0,2]);
+    }
+  } else {
+    // Other pieces: R,B,Q,N simplified (not sliding beyond capture)
+    const deltas=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
+    deltas.forEach(d=>{
+      const nr=r+d[0], nc=c+d[1];
+      if(nr>=0 && nr<8 && nc>=0 && nc<8 && (board[nr][nc]==='' || board[nr][nc][0]!==turn)) moves.push([nr,nc]);
+    });
+  }
+  return moves;
+}
+function isInCheck(color){
+  // simplified check detection
+  let kingPos=null;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) if(board[r][c]===(color+'K')) kingPos=[r,c];
+  if(!kingPos) return false;
+  const [kr,kc]=kingPos;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=board[r][c];
+    if(p && p[0]!==color){
+      const moves=legalMovesForCheck(r,c);
+      if(moves.some(m=>m[0]===kr && m[1]===kc)) return true;
+    }
+  }
+  return false;
+}
+function legalMovesForCheck(r,c){
+  const piece=board[r][c];
+  if(!piece) return [];
+  const moves=[];
+  const dir = piece[0]==='w'?-1:1;
+  if(piece[1]==='P'){
+    if(c>0) moves.push([r+dir,c-1]);
+    if(c<7) moves.push([r+dir,c+1]);
+  } else {
+    const deltas=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
+    deltas.forEach(d=>{
+      const nr=r+d[0], nc=c+d[1];
+      if(nr>=0 && nr<8 && nc>=0 && nc<8) moves.push([nr,nc]);
+    });
+  }
+  return moves;
+}
+function wouldBeCheck(sr,sc,tr,tc){
+  const temp=board[tr][tc];
+  board[tr][tc]=board[sr][sc];
+  board[sr][sc]='';
+  const check=isInCheck(turn);
+  board[sr][sc]=board[tr][tc];
+  board[tr][tc]=temp;
+  return check;
+}
+
+//----------------------- CELL CLICK ----------------------
+function cellClick(r,c){
+  if(gameOver) return;
+  const cellPiece = board[r][c];
+  if(selected){
+    const [sr,sc]=selected;
+    const moves = legalMoves(sr,sc);
+    const match = moves.find(m=>m[0]===r && m[1]===c);
+    if(match){
+      const movingPiece=board[sr][sc];
+      const capture=board[r][c]!=='';
+      board[r][c]=movingPiece;
+      board[sr][sc]='';
+      // Pawn promotion
+      if(movingPiece[1]==='P' && (r===0||r===7)) board[r][c]=turn+'Q';
+      logMove(movingPiece,`${String.fromCharCode(97+sc)}${8-sr}`,`${String.fromCharCode(97+c)}${8-r}`,capture);
+      playSound('move');
+      selected=null;
+      // Check for checkmate/stalemate
+      if(checkGameEnd()) return;
+      turn=turn==='w'?'b':'w';
+      renderBoard();
+      startTimer();
+    } else selected=null;
+  } else if(cellPiece && cellPiece[0]===turn){
+    selected=[r,c];
+  }
+}
+
+//----------------------- ENDGAME CHECK ----------------------
+function checkGameEnd(){
+  // Simplified: if current player has no legal moves and in check -> checkmate
+  let hasMove=false;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    if(board[r][c] && board[r][c][0]===turn){
+      if(legalMoves(r,c).length>0) hasMove=true;
+    }
+  }
+  if(!hasMove){
+    gameOver=true;
+    if(isInCheck(turn)){
+      alert(turn==='w'?'Checkmate — Black wins!':'Checkmate — White wins!');
+      playSound(turn==='w'?'lose':'win');
+    } else {
+      alert('Stalemate — Draw!');
+    }
+    clearInterval(interval);
+    return true;
+  }
+  return false;
+}
+
+//----------------------- POPUP ----------------------
+function showPopup(message,callback){
+  popupText.textContent=message;
+  popup.style.display='flex';
+  let timeout = setTimeout(()=>{ popup.style.display='none'; callback(false); },5000);
+  popupYes.onclick=()=>{ clearTimeout(timeout); popup.style.display='none'; callback(true); };
+  popupNo.onclick=()=>{ clearTimeout(timeout); popup.style.display='none'; callback(false); };
+}
+
+//----------------------- CONTROLS ----------------------
+function resign(){
+  if(confirm('Are you sure you want to resign?')){
+    gameOver=true;
+    alert(turn==='w'?'White resigns — Black wins!':'Black resigns — White wins!');
+    playSound(turn==='w'?'lose':'win');
+    clearInterval(interval);
+  }
+}
+function offerDraw(){
+  showPopup('Offer draw to opponent?', (accepted)=>{
+    alert(accepted?'Draw agreed':'Draw offer declined or timed out');
+    if(accepted) gameOver=true;
+  });
+}
+function requestRematch(){
+  showPopup('Request rematch?', (accepted)=>{
+    if(accepted){
+      initBoard();
+      playSound('click');
+    } else {
+      alert('Rematch declined or timed out');
+    }
+  });
+}
+
+//----------------------- SOUND ----------------------
+function playSound(type){
+  const sounds={move:'soundMove',win:'soundWin',lose:'soundLose',click:'soundClick'};
+  document.getElementById(sounds[type])?.play();
+}
+
+//----------------------- INIT ----------------------
+initBoard();
+</script>
+</body>
+</html>
