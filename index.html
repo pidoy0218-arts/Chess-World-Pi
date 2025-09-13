@@ -6,10 +6,10 @@
 <title>Chess Arena Pi — Classic Game</title>
 <style>
   :root {
-    --light-square: #f0f0d0;
-    --dark-square: #b58863;
-    --white-piece: #eee;
-    --black-piece: #222;
+    --light-square: #d9f0c1; /* light green */
+    --dark-square: #ffffff;   /* white */
+    --white-piece: #d3d3d3;   /* light gray solid */
+    --black-piece: #000000;   /* solid black */
     --highlight: #ffcc00;
   }
   body {
@@ -19,21 +19,19 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
     margin: 0;
     padding: 0;
-    height: 100vh;
   }
   h1 { margin: 10px; text-align: center; }
   #board {
     display: grid;
-    grid-template: repeat(8, 60px) / repeat(8, 60px);
+    grid-template: repeat(8, 50px) / repeat(8, 50px);
     gap: 0;
     margin: 20px 0;
   }
   .square {
-    width: 60px;
-    height: 60px;
+    width: 50px;
+    height: 50px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -93,7 +91,7 @@ let capturedPieces = {white: [], black: []};
 let timers = {white: 600, black: 600}; // 10min each
 let timerInterval = null;
 
-// Unicode pieces (solid for visibility)
+// Solid Unicode pieces
 const PIECES = {
   'wp':'♙', 'wr':'♖','wn':'♘','wb':'♗','wq':'♕','wk':'♔',
   'bp':'♟','br':'♜','bn':'♞','bb':'♝','bq':'♛','bk':'♚'
@@ -121,6 +119,7 @@ function initBoard() {
       sq.dataset.row = i;
       sq.dataset.col = j;
       sq.textContent = PIECES[board[i][j]] || '';
+      sq.style.color = (board[i][j] && board[i][j][0]==='w') ? 'var(--white-piece)' : 'var(--black-piece)';
       sq.addEventListener('click', () => selectSquare(i,j));
       boardEl.appendChild(sq);
     }
@@ -132,6 +131,7 @@ function updateBoard() {
     for(let j=0;j<8;j++){
       const sq = boardEl.children[i*8+j];
       sq.textContent = PIECES[board[i][j]] || '';
+      sq.style.color = (board[i][j] && board[i][j][0]==='w') ? 'var(--white-piece)' : 'var(--black-piece)';
       sq.classList.remove('highlight');
     }
   }
@@ -173,11 +173,8 @@ function attemptMove(from,toR,toC){
   return true;
 }
 
-// Simple legal move check placeholder (replace with full FIDE logic)
-function isLegalMove(r,c,toR,toC,piece){
-  // Here you can implement full FIDE logic (moves, castling, check)
-  return true; // temporary mock
-}
+// Placeholder for real FIDE move logic
+function isLegalMove(r,c,toR,toC,piece){ return true; }
 
 function updateCaptured(){
   whiteCapturedEl.textContent = capturedPieces.white.map(p=>PIECES[p]).join(' ');
