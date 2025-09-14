@@ -822,6 +822,30 @@ window.ChessArenaPi = {
   // allow external trigger for draw offers if desired
   requestDrawOffer: function(side){ sendDrawOfferToPi(side); }
 };
+function handleGameEnd(result) {
+  // Show result in log
+  document.getElementById("log").innerHTML += `<br><b>Game Over:</b> ${result}`;
+
+  // Optional Pi SDK call (non-blocking)
+  if (typeof window.Pi !== "undefined" && window.Pi.openShareDialog) {
+    try {
+      window.Pi.openShareDialog({
+        title: "Chess Arena Pi",
+        content: `Game ended: ${result}`,
+        url: window.location.href
+      });
+    } catch (err) {
+      console.error("Pi SDK error:", err);
+    }
+  } else {
+    console.log("Pi SDK not available — skipping Pi call");
+  }
+
+  // Single guaranteed redirect
+  setTimeout(() => {
+    window.location.href = "leaderboard.html";
+  }, 3000);
+}
 </script>
 </body>
 </html>
