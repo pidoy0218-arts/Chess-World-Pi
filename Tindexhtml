@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>CHESS ARENA for PI — FIDE Legal (Auto-Queen Promotion)</title>
+<title>CHESS ARENA for PI — 4FIDE Legal (Auto-Queen Promotion)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{ --bg:#111; --fg:#eee; --light:#f0f0f0; --dark:#b1e59f; --sel:#ffcc00; --hint:#5ac8fa; --accent:#f4b400; --warn:#ff5252 }
