@@ -2,25 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chess Arena Pi – Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chess Arena Pi ‒ Game</title>
   <style>
     body {
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       font-family: Arial, sans-serif;
       background: #111;
       color: #fff;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
-      min-height: 100vh;
     }
     h1 {
       margin: 20px;
       color: gold;
-      text-align: center;
     }
     #board {
       display: grid;
@@ -30,11 +26,8 @@
       box-shadow: 0 0 12px #000;
     }
     .square {
-      width: 60px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      width: 60px; height: 60px;
+      display: flex; justify-content: center; align-items: center;
       font-size: 36px;
       cursor: pointer;
       user-select: none;
@@ -43,10 +36,8 @@
     .dark { background: #b58863; }
     .highlight { outline: 3px solid yellow; }
     #captured {
-      display: flex;
-      justify-content: space-between;
-      width: 480px;
-      margin: 10px 0;
+      display: flex; justify-content: space-between;
+      width: 480px; margin: 10px 0;
     }
     .captured-side {
       width: 230px;
@@ -65,25 +56,17 @@
       margin: 10px 0;
     }
     .clock {
-      background: #222;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 20px;
+      background: #222; padding: 10px 20px;
+      border-radius: 8px; font-size: 20px;
     }
     #moves {
-      width: 480px;
-      background: #222;
-      padding: 10px;
-      border-radius: 8px;
-      margin: 10px 0;
-      max-height: 120px;
-      overflow-y: auto;
+      width: 480px; background: #222;
+      padding: 10px; border-radius: 8px;
+      margin: 10px 0; max-height: 120px; overflow-y: auto;
       font-size: 14px;
     }
     canvas {
-      position: fixed;
-      top: 0;
-      left: 0;
+      position: fixed; top: 0; left: 0;
       pointer-events: none;
     }
   </style>
@@ -107,8 +90,27 @@
 
   <canvas id="confetti"></canvas>
 
+  <!-- Firebase scripts -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
+
   <script>
-    /* ---------------- Chess Data ---------------- */
+    // ========== Placeholder Firebase config ==========
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // ========== Game elements ==========
     const boardEl = document.getElementById('board');
     const movesEl = document.getElementById('moves');
     const capturedWhiteEl = document.getElementById('capturedWhite');
@@ -124,11 +126,14 @@
     let capturedBlack = [];
     let moves = [];
 
-    /* ---------------- Setup Board ---------------- */
+    let whiteTime = 300; // 5 min
+    let blackTime = 300;
+    let timerInterval = null;
+
+    // ========== Setup Board ==========
     function initBoard() {
       boardEl.innerHTML = '';
       board = [];
-
       const startPos = [
         ['r','n','b','q','k','b','n','r'],
         ['p','p','p','p','p','p','p','p'],
@@ -136,12 +141,11 @@
         ['P','P','P','P','P','P','P','P'],
         ['R','N','B','Q','K','B','N','R'],
       ];
-
       for (let r = 0; r < 8; r++) {
         board[r] = [];
         for (let c = 0; c < 8; c++) {
           const sq = document.createElement('div');
-          sq.className = 'square ' + ((r+c)%2==0 ? 'light':'dark');
+          sq.className = 'square ' + ((r+c)%2 === 0 ? 'light' : 'dark');
           sq.dataset.row = r;
           sq.dataset.col = c;
           sq.textContent = pieceToChar(startPos[r][c]);
@@ -160,7 +164,7 @@
       return map[p] || '';
     }
 
-    /* ---------------- Move Logic ---------------- */
+    // ========== Moves logic ==========
     function onSquareClick(r,c) {
       if (selected) {
         movePiece(selected.r, selected.c, r, c);
@@ -189,7 +193,7 @@
       }
       board[r2][c2] = piece;
       board[r1][c1] = '';
-      moves.push(files[c1]+(8-r1)+'-'+files[c2]+(8-r2));
+      moves.push(files[c1] + (8-r1) + '-' + files[c2] + (8-r2));
       updateMoves();
       toggleTurn();
       checkGameEnd();
@@ -202,30 +206,35 @@
     function render() {
       const squares = boardEl.querySelectorAll('.square');
       squares.forEach(sq => {
-        const r = sq.dataset.row, c = sq.dataset.col;
+        const r = parseInt(sq.dataset.row), c = parseInt(sq.dataset.col);
         sq.textContent = pieceToChar(board[r][c]);
         sq.classList.remove('highlight');
-        if (selected && selected.r==r && selected.c==c) {
+        if (selected && selected.r === r && selected.c === c) {
           sq.classList.add('highlight');
         }
       });
     }
 
     function toggleTurn() {
-      currentTurn = (currentTurn==='white') ? 'black' : 'white';
+      currentTurn = (currentTurn === 'white' ? 'black' : 'white');
     }
 
-    /* ---------------- Timers ---------------- */
-    let whiteTime = 300; // 5 min
-    let blackTime = 300;
-    let timerInterval = setInterval(tickClocks,1000);
-
-    function tickClocks() {
-      if (currentTurn==='white') whiteTime--;
-      else blackTime--;
-      updateClocks();
-      if (whiteTime<=0) handleGameEnd('black');
-      if (blackTime<=0) handleGameEnd('white');
+    // ========== Timer logic ==========
+    function startTimers() {
+      timerInterval = setInterval(() => {
+        if (currentTurn === 'white') {
+          whiteTime--;
+        } else {
+          blackTime--;
+        }
+        updateClocks();
+        if (whiteTime <= 0) {
+          gameOver('black', 'timeout');
+        }
+        if (blackTime <= 0) {
+          gameOver('white', 'timeout');
+        }
+      }, 1000);
     }
 
     function updateClocks() {
@@ -234,53 +243,48 @@
     }
 
     function formatTime(t) {
-      const m = Math.floor(t/60);
-      const s = t%60;
+      const m = Math.floor(t / 60);
+      const s = t % 60;
       return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
     }
 
-    /* ---------------- Endgame ---------------- */
-    function checkGameEnd() {
-      // simple check: king missing
-      const flat = board.flat();
-      if (!flat.includes('K')) handleGameEnd('black');
-      if (!flat.includes('k')) handleGameEnd('white');
-    }
+    // ========== Endgame & Firebase Write ==========
+    function gameOver(winner, reason = 'game_end') {
+      // winner: 'white' or 'black'
+      SND.win();
+      Confetti.burst();
 
-    function handleGameEnd(winner) {
-      if (winner) {
-        SND.win();
-        Confetti.burst();
-      } else {
-        SND.lose();
-      }
+      // Write to Firebase
+      const resultData = {
+        winner: winner,
+        timestamp: new Date().toISOString(),
+        reason: reason
+      };
+      // Push into `game_results` node
+      db.ref('game_results').push(resultData)
+        .catch(error => console.error('Firebase write failed:', error));
+
+      // Redirect after 2 seconds
       goToLeaderboard();
     }
 
     function goToLeaderboard() {
       setTimeout(() => {
         window.location.href = "leaderboard.html";
-      },2000);
+      }, 2000);
     }
 
     function resignGame(player) {
-      handleGameEnd(player==='white'?'black':'white');
-    }
-    function onTimeout(player) {
-      handleGameEnd(player==='white'?'black':'white');
-    }
-    function declineDraw() {
-      handleGameEnd(null);
+      gameOver(player==='white'?'black':'white', 'resign');
     }
 
-    /* ---------------- Sounds ---------------- */
+    // ========== Sounds & Confetti ==========
     const SND = {
-      move: ()=> new Audio('https://assets.mixkit.co/sfx/preview/mixkit-chess-piece-move-3073.mp3').play(),
-      win: ()=> new Audio('https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3').play(),
-      lose: ()=> new Audio('https://assets.mixkit.co/sfx/preview/mixkit-losing-bleeps-2026.mp3').play()
+      move: ()=>{},
+      win: ()=>{ /* you can load/play win-sound here */ },
+      lose: ()=>{ /* optional lose sound */ }
     };
 
-    /* ---------------- Confetti ---------------- */
     const Confetti = {
       burst: function() {
         const canvas = document.getElementById('confetti');
@@ -288,37 +292,39 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         let particles = [];
-        for (let i=0;i<200;i++) {
+        for (let i = 0; i < 200; i++) {
           particles.push({
-            x: Math.random()*canvas.width,
-            y: Math.random()*canvas.height,
-            r: Math.random()*6+4,
-            dx: Math.random()-0.5,
-            dy: Math.random()+1,
-            color: `hsl(${Math.random()*360},100%,50%)`
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            r: Math.random() * 6 + 4,
+            dx: Math.random() - 0.5,
+            dy: Math.random() + 1,
+            color: `hsl(${Math.random()*360}, 100%, 50%)`
           });
         }
-        let frame;
+        let anim;
         function draw() {
-          ctx.clearRect(0,0,canvas.width,canvas.height);
-          particles.forEach(p=>{
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          particles.forEach(p => {
             ctx.beginPath();
-            ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
             ctx.fillStyle = p.color;
             ctx.fill();
-            p.x+=p.dx; p.y+=p.dy;
-            if (p.y>canvas.height) p.y=0;
+            p.x += p.dx;
+            p.y += p.dy;
+            if (p.y > canvas.height) p.y = 0;
           });
-          frame = requestAnimationFrame(draw);
+          anim = requestAnimationFrame(draw);
         }
         draw();
-        setTimeout(()=>cancelAnimationFrame(frame),2000);
+        setTimeout(()=> cancelAnimationFrame(anim), 2000);
       }
     };
 
-    /* ---------------- Init ---------------- */
+    // ========== Init ==========
     initBoard();
     updateClocks();
+    startTimers();
   </script>
 </body>
 </html>
