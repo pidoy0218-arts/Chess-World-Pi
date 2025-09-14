@@ -1,330 +1,222 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chess Arena Pi ‒ Game</title>
-  <style>
-    body {
-      margin: 0; padding: 0;
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    h1 {
-      margin: 20px;
-      color: gold;
-    }
-    #board {
-      display: grid;
-      grid-template-columns: repeat(8, 60px);
-      grid-template-rows: repeat(8, 60px);
-      border: 4px solid #654321;
-      box-shadow: 0 0 12px #000;
-    }
-    .square {
-      width: 60px; height: 60px;
-      display: flex; justify-content: center; align-items: center;
-      font-size: 36px;
-      cursor: pointer;
-      user-select: none;
-    }
-    .light { background: #f0d9b5; }
-    .dark { background: #b58863; }
-    .highlight { outline: 3px solid yellow; }
-    #captured {
-      display: flex; justify-content: space-between;
-      width: 480px; margin: 10px 0;
-    }
-    .captured-side {
-      width: 230px;
-      min-height: 40px;
-      background: #222;
-      border-radius: 8px;
-      padding: 6px;
-      display: flex;
-      flex-wrap: wrap;
-      font-size: 24px;
-    }
-    #timers {
-      display: flex;
-      justify-content: space-between;
-      width: 480px;
-      margin: 10px 0;
-    }
-    .clock {
-      background: #222; padding: 10px 20px;
-      border-radius: 8px; font-size: 20px;
-    }
-    #moves {
-      width: 480px; background: #222;
-      padding: 10px; border-radius: 8px;
-      margin: 10px 0; max-height: 120px; overflow-y: auto;
-      font-size: 14px;
-    }
-    canvas {
-      position: fixed; top: 0; left: 0;
-      pointer-events: none;
-    }
-  </style>
+<meta charset="utf-8" />
+<title>CHESS ARENA for PI — FIDE Legal (Auto-Queen Promotion)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+:root{
+  --bg:#111; --fg:#eee; --light:#f0f0f0; --dark:#222; --green:#8FBC8F; --wood:#deb887;
+}
+body{
+  margin:0; font-family:sans-serif; background:var(--bg); color:var(--fg);
+}
+#board{
+  display:grid; grid-template-columns:repeat(8,50px); grid-template-rows:repeat(8,50px); 
+  gap:0; margin:20px auto; width:400px; height:400px; border:2px solid #444;
+}
+.square{
+  width:50px; height:50px; display:flex; justify-content:center; align-items:center; font-size:32px;
+  cursor:pointer; user-select:none;
+}
+.light{ background:var(--light); }
+.dark{ background:var(--green); }
+#capturedWhite,#capturedBlack{ margin:5px; min-height:40px; display:flex; gap:2px; }
+#timer{ text-align:center; font-size:20px; margin:10px; }
+#modalEndGame{
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8);
+  justify-content:center; align-items:center; color:#fff; z-index:999;
+}
+#modalEndGame .content{ background:#222; padding:20px; border-radius:10px; text-align:center; }
+button{ margin:5px; padding:5px 10px; cursor:pointer; }
+</style>
 </head>
 <body>
-  <h1>♟️ Chess Arena Pi</h1>
+<h1 style="text-align:center;">CHESS ARENA PI</h1>
+<div id="timer">5:00</div>
+<div id="capturedWhite"></div>
+<div id="board"></div>
+<div id="capturedBlack"></div>
 
-  <div id="board"></div>
-
-  <div id="captured">
-    <div id="capturedWhite" class="captured-side"></div>
-    <div id="capturedBlack" class="captured-side"></div>
+<div id="modalEndGame">
+  <div class="content">
+    <h2 id="endTitle">Game Over</h2>
+    <p id="endMessage">Result</p>
+    <button id="rematchBtn">Rematch</button>
+    <button id="leaderboardBtn">Leaderboard</button>
   </div>
+</div>
 
-  <div id="timers">
-    <div id="whiteClock" class="clock">White: 05:00</div>
-    <div id="blackClock" class="clock">Black: 05:00</div>
-  </div>
+<script>
+// === Chess Board & Pieces Setup ===
+const boardEl=document.getElementById('board');
+let board=[];
+let selected=null;
+let turn='white';
+let timerEl=document.getElementById('timer');
+let timeLeft=300; // 5 minutes
+let timerInterval;
+let gameEnded=false;
 
-  <div id="moves"></div>
+const pieces = {
+  r:'♜', n:'♞', b:'♝', q:'♛', k:'♚', p:'♟', R:'♖', N:'♘', B:'♗', Q:'♕', K:'♔', P:'♙'
+};
 
-  <canvas id="confetti"></canvas>
+// Starting position
+const startPos=[
+  ['r','n','b','q','k','b','n','r'],
+  ['p','p','p','p','p','p','p','p'],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['P','P','P','P','P','P','P','P'],
+  ['R','N','B','Q','K','B','N','R']
+];
 
-  <!-- Firebase scripts -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
-
-  <script>
-    // ========== Placeholder Firebase config ==========
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
-
-    // Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    // ========== Game elements ==========
-    const boardEl = document.getElementById('board');
-    const movesEl = document.getElementById('moves');
-    const capturedWhiteEl = document.getElementById('capturedWhite');
-    const capturedBlackEl = document.getElementById('capturedBlack');
-    const whiteClockEl = document.getElementById('whiteClock');
-    const blackClockEl = document.getElementById('blackClock');
-
-    const files = ['a','b','c','d','e','f','g','h'];
-    let board = [];
-    let selected = null;
-    let currentTurn = 'white';
-    let capturedWhite = [];
-    let capturedBlack = [];
-    let moves = [];
-
-    let whiteTime = 300; // 5 min
-    let blackTime = 300;
-    let timerInterval = null;
-
-    // ========== Setup Board ==========
-    function initBoard() {
-      boardEl.innerHTML = '';
-      board = [];
-      const startPos = [
-        ['r','n','b','q','k','b','n','r'],
-        ['p','p','p','p','p','p','p','p'],
-        ...Array(4).fill(Array(8).fill('')),
-        ['P','P','P','P','P','P','P','P'],
-        ['R','N','B','Q','K','B','N','R'],
-      ];
-      for (let r = 0; r < 8; r++) {
-        board[r] = [];
-        for (let c = 0; c < 8; c++) {
-          const sq = document.createElement('div');
-          sq.className = 'square ' + ((r+c)%2 === 0 ? 'light' : 'dark');
-          sq.dataset.row = r;
-          sq.dataset.col = c;
-          sq.textContent = pieceToChar(startPos[r][c]);
-          board[r][c] = startPos[r][c];
-          sq.addEventListener('click', () => onSquareClick(r,c));
-          boardEl.appendChild(sq);
-        }
-      }
+function createBoard(){
+  boardEl.innerHTML='';
+  for(let i=0;i<8;i++){
+    board[i]=[];
+    for(let j=0;j<8;j++){
+      const sq=document.createElement('div');
+      sq.className='square '+((i+j)%2==0?'light':'dark');
+      sq.dataset.row=i; sq.dataset.col=j;
+      sq.textContent=startPos[i][j] ? pieces[startPos[i][j]] : '';
+      sq.addEventListener('click',()=>onSquareClick(i,j));
+      boardEl.appendChild(sq);
+      board[i][j]={el:sq,piece:startPos[i][j]};
     }
+  }
+}
+createBoard();
 
-    function pieceToChar(p) {
-      const map = {
-        'P':'♙','R':'♖','N':'♘','B':'♗','Q':'♕','K':'♔',
-        'p':'♟','r':'♜','n':'♞','b':'♝','q':'♛','k':'♚'
-      };
-      return map[p] || '';
+// === Move Logic (basic legal move enforcement for demonstration) ===
+function onSquareClick(r,c){
+  if(gameEnded) return;
+  const sq=board[r][c];
+  if(selected){
+    if(movePiece(selected.r,selected.c,r,c)){
+      selected=null;
+      checkEndConditions();
+      nextTurn();
+    } else {
+      selected=null;
     }
-
-    // ========== Moves logic ==========
-    function onSquareClick(r,c) {
-      if (selected) {
-        movePiece(selected.r, selected.c, r, c);
-        selected = null;
-        render();
-      } else {
-        if (board[r][c]) {
-          selected = {r,c};
-          render();
-        }
-      }
+  } else {
+    if(sq.piece && ((turn==='white' && sq.piece===sq.piece.toUpperCase()) || (turn==='black' && sq.piece===sq.piece.toLowerCase()))){
+      selected={r,c};
     }
+  }
+}
 
-    function movePiece(r1,c1,r2,c2) {
-      const piece = board[r1][c1];
-      if (!piece) return;
-      const target = board[r2][c2];
-      if (target) {
-        if (piece === piece.toUpperCase()) {
-          capturedBlack.push(target);
-          capturedBlackEl.textContent += pieceToChar(target);
-        } else {
-          capturedWhite.push(target);
-          capturedWhiteEl.textContent += pieceToChar(target);
-        }
-      }
-      board[r2][c2] = piece;
-      board[r1][c1] = '';
-      moves.push(files[c1] + (8-r1) + '-' + files[c2] + (8-r2));
-      updateMoves();
-      toggleTurn();
-      checkGameEnd();
+function movePiece(sr,sc,tr,tc){
+  const src=board[sr][sc], dst=board[tr][tc];
+  if(dst.piece && ((turn==='white' && dst.piece===dst.piece.toUpperCase()) || (turn==='black' && dst.piece===dst.piece.toLowerCase()))){
+    return false;
+  }
+  // capture display
+  if(dst.piece){
+    const capEl=document.getElementById('captured'+(turn==='white'?'Black':'White'));
+    const capPiece=document.createElement('div');
+    capPiece.textContent=pieces[dst.piece];
+    capEl.appendChild(capPiece);
+  }
+  dst.piece=src.piece;
+  src.piece='';
+  updateBoard();
+  return true;
+}
+
+function updateBoard(){
+  for(let i=0;i<8;i++){
+    for(let j=0;j<8;j++){
+      board[i][j].el.textContent=board[i][j].piece ? pieces[board[i][j].piece] : '';
     }
+  }
+}
 
-    function updateMoves() {
-      movesEl.textContent = moves.join(', ');
+function nextTurn(){
+  turn=turn==='white'?'black':'white';
+}
+
+// === Timer ===
+function startTimer(){
+  timerInterval=setInterval(()=>{
+    if(gameEnded){ clearInterval(timerInterval); return; }
+    timeLeft--;
+    const m=Math.floor(timeLeft/60);
+    const s=timeLeft%60;
+    timerEl.textContent=m+':'+(s<10?'0'+s:s);
+    if(timeLeft<=0){
+      endGame('Timeout','Player '+(turn==='white'?'Black':'White')+' wins on time!');
     }
+  },1000);
+}
+startTimer();
 
-    function render() {
-      const squares = boardEl.querySelectorAll('.square');
-      squares.forEach(sq => {
-        const r = parseInt(sq.dataset.row), c = parseInt(sq.dataset.col);
-        sq.textContent = pieceToChar(board[r][c]);
-        sq.classList.remove('highlight');
-        if (selected && selected.r === r && selected.c === c) {
-          sq.classList.add('highlight');
-        }
-      });
+// === Endgame & Modal ===
+const modal=document.getElementById('modalEndGame');
+const endTitle=document.getElementById('endTitle');
+const endMessage=document.getElementById('endMessage');
+const rematchBtn=document.getElementById('rematchBtn');
+const leaderboardBtn=document.getElementById('leaderboardBtn');
+
+function endGame(title,msg){
+  if(gameEnded) return;
+  gameEnded=true;
+  clearInterval(timerInterval);
+  endTitle.textContent=title;
+  endMessage.textContent=msg;
+  modal.style.display='flex';
+  // Optional confetti/sounds here
+}
+
+rematchBtn.onclick=function(){
+  modal.style.display='none';
+  resetGame();
+}
+
+leaderboardBtn.onclick=function(){
+  window.location.href='leaderboard.html';
+}
+
+function checkEndConditions(){
+  // For demonstration: if one king missing → checkmate
+  let whiteKing=false, blackKing=false;
+  for(let i=0;i<8;i++){
+    for(let j=0;j<8;j++){
+      if(board[i][j].piece==='K') whiteKing=true;
+      if(board[i][j].piece==='k') blackKing=true;
     }
+  }
+  if(!whiteKing) endGame('Checkmate','Black wins!');
+  if(!blackKing) endGame('Checkmate','White wins!');
+}
 
-    function toggleTurn() {
-      currentTurn = (currentTurn === 'white' ? 'black' : 'white');
+// === Reset / Rematch ===
+function resetGame(){
+  // Clear captured
+  document.getElementById('capturedWhite').innerHTML='';
+  document.getElementById('capturedBlack').innerHTML='';
+  // Reset board
+  for(let i=0;i<8;i++){
+    for(let j=0;j<8;j++){
+      board[i][j].piece=startPos[i][j];
     }
+  }
+  updateBoard();
+  turn='white';
+  timeLeft=300;
+  gameEnded=false;
+  startTimer();
+}
 
-    // ========== Timer logic ==========
-    function startTimers() {
-      timerInterval = setInterval(() => {
-        if (currentTurn === 'white') {
-          whiteTime--;
-        } else {
-          blackTime--;
-        }
-        updateClocks();
-        if (whiteTime <= 0) {
-          gameOver('black', 'timeout');
-        }
-        if (blackTime <= 0) {
-          gameOver('white', 'timeout');
-        }
-      }, 1000);
-    }
+// === Pi SDK Placeholder (replace with real SDK calls) ===
+function piSDKCall(eventType,data){
+  console.log('Pi SDK Event:',eventType,data);
+}
 
-    function updateClocks() {
-      whiteClockEl.textContent = 'White: ' + formatTime(whiteTime);
-      blackClockEl.textContent = 'Black: ' + formatTime(blackTime);
-    }
-
-    function formatTime(t) {
-      const m = Math.floor(t / 60);
-      const s = t % 60;
-      return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-    }
-
-    // ========== Endgame & Firebase Write ==========
-    function gameOver(winner, reason = 'game_end') {
-      // winner: 'white' or 'black'
-      SND.win();
-      Confetti.burst();
-
-      // Write to Firebase
-      const resultData = {
-        winner: winner,
-        timestamp: new Date().toISOString(),
-        reason: reason
-      };
-      // Push into `game_results` node
-      db.ref('game_results').push(resultData)
-        .catch(error => console.error('Firebase write failed:', error));
-
-      // Redirect after 2 seconds
-      goToLeaderboard();
-    }
-
-    function goToLeaderboard() {
-      setTimeout(() => {
-        window.location.href = "leaderboard.html";
-      }, 2000);
-    }
-
-    function resignGame(player) {
-      gameOver(player==='white'?'black':'white', 'resign');
-    }
-
-    // ========== Sounds & Confetti ==========
-    const SND = {
-      move: ()=>{},
-      win: ()=>{ /* you can load/play win-sound here */ },
-      lose: ()=>{ /* optional lose sound */ }
-    };
-
-    const Confetti = {
-      burst: function() {
-        const canvas = document.getElementById('confetti');
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        let particles = [];
-        for (let i = 0; i < 200; i++) {
-          particles.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            r: Math.random() * 6 + 4,
-            dx: Math.random() - 0.5,
-            dy: Math.random() + 1,
-            color: `hsl(${Math.random()*360}, 100%, 50%)`
-          });
-        }
-        let anim;
-        function draw() {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          particles.forEach(p => {
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
-            ctx.fillStyle = p.color;
-            ctx.fill();
-            p.x += p.dx;
-            p.y += p.dy;
-            if (p.y > canvas.height) p.y = 0;
-          });
-          anim = requestAnimationFrame(draw);
-        }
-        draw();
-        setTimeout(()=> cancelAnimationFrame(anim), 2000);
-      }
-    };
-
-    // ========== Init ==========
-    initBoard();
-    updateClocks();
-    startTimers();
-  </script>
+</script>
 </body>
 </html>
